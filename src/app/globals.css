@@ -1,26 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --c-bg: #F5F6F2;
+  --c-surface: #FFFFFF;
+  --c-border: #E8EAE3;
+  --c-border-soft: #EEF0EA;
+  --c-ink: #0E0F0C;
+  --c-ink-2: #1F2219;
+  --c-ink-3: #3A3E34;
+  --c-muted: #5A5E54;
+  --c-subtle: #71756C;
+  --c-faint: #9A9E94;
+  --c-ghost: #B6BAAF;
+  --c-rule: #D2D6CB;
+  --c-fill: #F2F3EF;
+  --c-fill-soft: #FAFBF9;
+  --c-accent: #FF5C1F;
+  --c-accent-2: #FF7A45;
+  --c-accent-bg: #FFF1EA;
+  --c-accent-dark: #C2430F;
+  --c-green: #0E8C63;
+  --c-green-bg: #E7FAF3;
+  --c-amber: #C99211;
+  --c-amber-bg: #FCF3D9;
+  --c-red: #EF4444;
+  --c-red-bg: #FEE2E2;
+  --c-blue: #2563EB;
+  --c-blue-bg: #EAF1FF;
+  --c-purple: #7C3AED;
+  --c-purple-bg: #F3EEFE;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Hanken Grotesk', sans-serif;
+  --shadow-card: 0 1px 2px rgba(16,17,12,.04), 0 14px 30px -22px rgba(16,17,12,.18);
+  --shadow-modal: 0 40px 90px -30px rgba(0,0,0,.6);
+  --shadow-accent: 0 8px 22px -8px rgba(255,92,31,.7);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+* { box-sizing: border-box; margin: 0; padding: 0; border: 0; }
+html, body { height: 100%; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  background: var(--c-bg);
+  color: var(--c-ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+input, textarea, select, button { font-family: inherit; font-size: inherit; outline: none; background: transparent; border: none; }
+input, textarea, select { cursor: text; }
+button { cursor: pointer; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes popIn { 0% { opacity: 0; transform: scale(.92) translateY(8px); } 100% { opacity: 1; transform: none; } }
+@keyframes sparkleSpin { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes ringIn { from { stroke-dashoffset: 339; } }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes dot { 0%,80%,100% { opacity: .25; transform: scale(.7); } 40% { opacity: 1; transform: scale(1); } }
+@keyframes pulseRing { 0% { transform: scale(1); opacity: .8; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes gridMove { 0% { transform: translateX(0) translateY(0); } 100% { transform: translateX(40px) translateY(40px); } }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-rule); border-radius: 10px; }

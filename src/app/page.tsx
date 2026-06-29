@@ -1,65 +1,95 @@
-import Image from "next/image";
+'use client'
+import { useApp, AppProvider } from '@/lib/store'
+import Login from '@/components/shell/Login'
+import Sidebar from '@/components/shell/Sidebar'
+import TopBar from '@/components/shell/TopBar'
+import MyDay from '@/components/work/MyDay'
+import ContentCalendar from '@/components/work/ContentCalendar'
+import ContentPlanner from '@/components/work/ContentPlanner'
+import DayPlanner from '@/components/work/DayPlanner'
+import ClientsScreen from '@/components/accounts/ClientsScreen'
+import ClientDetail from '@/components/accounts/ClientDetail'
+import ReportsScreen from '@/components/accounts/ReportsScreen'
+import InboxScreen from '@/components/accounts/InboxScreen'
+import PipelineScreen from '@/components/sales/PipelineScreen'
+import LeadsScreen from '@/components/sales/LeadsScreen'
+import TeamScreen from '@/components/org/TeamScreen'
+import PerformanceScreen from '@/components/org/PerformanceScreen'
+import PermissionsScreen from '@/components/org/PermissionsScreen'
+import ConnectionsScreen from '@/components/org/ConnectionsScreen'
+import AutomationsScreen from '@/components/org/AutomationsScreen'
+import KnowledgeScreen from '@/components/org/KnowledgeScreen'
+
+function screenLabel(screen: string) {
+  const map: Record<string, string> = {
+    myday: 'My Day', planner: 'Day Planner', calendar: 'Content Calendar',
+    contentplan: 'Content Planner', clients: 'Accounts', 'client-detail': 'Client Detail',
+    reports: 'Reports', inbox: 'Inbox', pipeline: 'Pipeline', leads: 'Leads',
+    team: 'Team', permissions: 'Permissions', performance: 'Performance',
+    connections: 'Connections', automations: 'Automations', knowledge: 'Knowledge',
+  }
+  return map[screen] || screen
+}
+
+function AppShell() {
+  const { state, dispatch } = useApp()
+
+  async function handleLogin(email: string, pass: string) {
+    const users = [
+      { id:'dev', email:'dev@mavixy.com', pass:'dev123', name:'Dev Sharma', initials:'DS', color:'#8B5CF6', role:'manager' as const, title:'Strategist', permissions:[], created_at:'' },
+      { id:'ira', email:'ira@mavixy.com', pass:'ira123', name:'Ira Nair', initials:'IN', color:'#2563EB', role:'manager' as const, title:'Account Mgr', permissions:[], created_at:'' },
+      { id:'owner', email:'owner@mavixy.com', pass:'owner123', name:'Rahul Anand', initials:'RA', color:'#FF5C1F', role:'owner' as const, title:'Founder', permissions:[], created_at:'' },
+      { id:'aanya', email:'aanya@mavixy.com', pass:'aanya123', name:'Aanya Mehra', initials:'AM', color:'#0EA5A4', role:'employee' as const, title:'Designer', permissions:[], created_at:'' },
+    ]
+    const user = users.find(u => u.email === email && u.pass === pass)
+    if (!user) throw new Error('Invalid credentials')
+    const { pass: _, ...profile } = user
+    dispatch({ type: 'SET_USER', user: profile })
+  }
+
+  if (!state.isLoggedIn) {
+    return <Login onLogin={handleLogin} />
+  }
+
+  function renderScreen() {
+    switch (state.screen) {
+      case 'myday': return <MyDay />
+      case 'planner': return <DayPlanner />
+      case 'calendar': return <ContentCalendar />
+      case 'contentplan': return <ContentPlanner />
+      case 'clients': return <ClientsScreen />
+      case 'client-detail': return <ClientDetail />
+      case 'reports': return <ReportsScreen />
+      case 'inbox': return <InboxScreen />
+      case 'pipeline': return <PipelineScreen />
+      case 'leads': return <LeadsScreen />
+      case 'team': return <TeamScreen />
+      case 'performance': return <PerformanceScreen />
+      case 'permissions': return <PermissionsScreen />
+      case 'connections': return <ConnectionsScreen />
+      case 'automations': return <AutomationsScreen />
+      case 'knowledge': return <KnowledgeScreen />
+      default: return <MyDay />
+    }
+  }
+
+  return (
+    <div style={{ display:'flex', height:'100vh', background:'var(--c-bg)', fontFamily:'var(--font-body)', overflow:'hidden' }}>
+      <Sidebar />
+      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
+        <TopBar />
+        <main style={{ flex:1, overflowY:'auto', padding:28 }}>
+          {renderScreen()}
+        </main>
+      </div>
+    </div>
+  )
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    <AppProvider>
+      <AppShell />
+    </AppProvider>
+  )
 }
