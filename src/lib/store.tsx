@@ -1,33 +1,32 @@
 'use client'
-import React, { createContext, useContext, useReducer, useCallback } from 'react'
-import type { Screen, Profile, PlanItem, Task, AttendanceRecord, Deal } from '@/types'
-import { SEED_CLIENTS, SEED_TEAM, SEED_PLAN_ITEMS } from './seed-data'
-
-interface Client {
-  id: string; name: string; initials: string; color: string
-  health: number; services: string[]; type: string
-  industry?: string; contact_name?: string; contact_email?: string
-}
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
+import type { Screen, Profile, PlanItem, Task, AttendanceRecord, Deal, Client } from '@/types'
+import { SEED_CLIENTS, SEED_TEAM } from './seed-data'
+import { createClient } from './supabase/client'
+import {
+  loadWorkspace, seedDemoData,
+  dbUpsertPlanItem, dbDeletePlanItem,
+  dbUpsertClient, dbUpsertTask, dbUpsertDeal,
+} from './db'
 
 interface AppState {
   screen: Screen
   currentUser: Profile | null
   isLoggedIn: boolean
-  users: any[]
+  authLoading: boolean
+  users: Profile[]
   clients: Client[]
   planItems: PlanItem[]
   tasks: Task[]
   attendance: AttendanceRecord[]
   deals: Deal[]
   selectedClientId: string | null
-  // UI state
   toast: string | null
   briefOpen: boolean
   addUserOpen: boolean
   editUserId: string | null
   notifOpen: boolean
   attPanelOpen: boolean
-  // check-in state
   checkedIn: boolean
   checkInTime: Date | null
   onBreak: boolean
@@ -40,6 +39,8 @@ type Action =
   | { type: 'SET_CLIENT_DETAIL'; clientId: string }
   | { type: 'SET_USER'; user: Profile }
   | { type: 'LOGOUT' }
+  | { type: 'AUTH_LOADED' }
+  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[] }
   | { type: 'SET_PLAN_ITEMS'; items: PlanItem[] }
   | { type: 'UPSERT_PLAN_ITEM'; item: PlanItem }
   | { type: 'DELETE_PLAN_ITEM'; id: string }
@@ -47,8 +48,8 @@ type Action =
   | { type: 'UPSERT_TASK'; task: Task }
   | { type: 'SET_CLIENTS'; clients: Client[] }
   | { type: 'UPSERT_CLIENT'; client: Client }
-  | { type: 'SET_USERS'; users: any[] }
-  | { type: 'UPSERT_USER'; user: any }
+  | { type: 'SET_USERS'; users: Profile[] }
+  | { type: 'UPSERT_USER'; user: Profile }
   | { type: 'DELETE_USER'; id: string }
   | { type: 'SET_DEALS'; deals: Deal[] }
   | { type: 'UPSERT_DEAL'; deal: Deal }
@@ -70,9 +71,10 @@ const initial: AppState = {
   screen: 'myday',
   currentUser: null,
   isLoggedIn: false,
-  users: SEED_TEAM,
-  clients: SEED_CLIENTS,
-  planItems: SEED_PLAN_ITEMS as any[],
+  authLoading: true,
+  users: SEED_TEAM as any[],
+  clients: SEED_CLIENTS as any[],
+  planItems: [],
   tasks: [],
   attendance: [],
   deals: [],
@@ -90,54 +92,38 @@ const initial: AppState = {
   totalBreakMs: 0,
 }
 
+function upsert<T extends { id: string }>(list: T[], item: T): T[] {
+  const idx = list.findIndex(x => x.id === item.id)
+  return idx >= 0 ? list.map((x, i) => i === idx ? item : x) : [...list, item]
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_SCREEN': return { ...state, screen: action.screen }
-    case 'SET_CLIENT_DETAIL': return { ...state, selectedClientId: action.clientId }
-    case 'SET_USER': return { ...state, currentUser: action.user, isLoggedIn: true }
-    case 'LOGOUT': return { ...initial, isLoggedIn: false }
-    case 'SET_PLAN_ITEMS': return { ...state, planItems: action.items }
-    case 'UPSERT_PLAN_ITEM': {
-      const exists = state.planItems.find(x => x.id === action.item.id)
-      return { ...state, planItems: exists
-        ? state.planItems.map(x => x.id === action.item.id ? action.item : x)
-        : [...state.planItems, action.item]
-      }
+    case 'SET_CLIENT_DETAIL': return { ...state, selectedClientId: action.clientId, screen: 'client-detail' }
+    case 'SET_USER': return { ...state, currentUser: action.user, isLoggedIn: true, authLoading: false }
+    case 'AUTH_LOADED': return { ...state, authLoading: false }
+    case 'LOGOUT': return { ...initial, isLoggedIn: false, authLoading: false }
+    case 'SET_WORKSPACE': return {
+      ...state,
+      clients: action.clients.length ? action.clients : state.clients,
+      planItems: action.planItems,
+      tasks: action.tasks,
+      deals: action.deals,
+      users: action.users.length ? action.users : state.users,
     }
+    case 'SET_PLAN_ITEMS': return { ...state, planItems: action.items }
+    case 'UPSERT_PLAN_ITEM': return { ...state, planItems: upsert(state.planItems, action.item) }
     case 'DELETE_PLAN_ITEM': return { ...state, planItems: state.planItems.filter(x => x.id !== action.id) }
     case 'SET_TASKS': return { ...state, tasks: action.tasks }
-    case 'UPSERT_TASK': {
-      const exists = state.tasks.find(x => x.id === action.task.id)
-      return { ...state, tasks: exists
-        ? state.tasks.map(x => x.id === action.task.id ? action.task : x)
-        : [...state.tasks, action.task]
-      }
-    }
+    case 'UPSERT_TASK': return { ...state, tasks: upsert(state.tasks, action.task) }
     case 'SET_CLIENTS': return { ...state, clients: action.clients }
-    case 'UPSERT_CLIENT': {
-      const exists = state.clients.find(x => x.id === action.client.id)
-      return { ...state, clients: exists
-        ? state.clients.map(x => x.id === action.client.id ? action.client : x)
-        : [...state.clients, action.client]
-      }
-    }
+    case 'UPSERT_CLIENT': return { ...state, clients: upsert(state.clients, action.client) }
     case 'SET_USERS': return { ...state, users: action.users }
-    case 'UPSERT_USER': {
-      const exists = state.users.find(x => x.id === action.user.id)
-      return { ...state, users: exists
-        ? state.users.map(x => x.id === action.user.id ? action.user : x)
-        : [...state.users, action.user]
-      }
-    }
+    case 'UPSERT_USER': return { ...state, users: upsert(state.users, action.user) }
     case 'DELETE_USER': return { ...state, users: state.users.filter(x => x.id !== action.id) }
     case 'SET_DEALS': return { ...state, deals: action.deals }
-    case 'UPSERT_DEAL': {
-      const exists = state.deals.find(x => x.id === action.deal.id)
-      return { ...state, deals: exists
-        ? state.deals.map(x => x.id === action.deal.id ? action.deal : x)
-        : [...state.deals, action.deal]
-      }
-    }
+    case 'UPSERT_DEAL': return { ...state, deals: upsert(state.deals, action.deal) }
     case 'SET_ATTENDANCE': return { ...state, attendance: action.attendance }
     case 'SHOW_TOAST': return { ...state, toast: action.msg }
     case 'CLEAR_TOAST': return { ...state, toast: null }
@@ -159,7 +145,52 @@ const Ctx = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } 
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial)
+  const sb = createClient()
+
+  // ── Boot: check existing session ─────────────────────────────────────────
+  useEffect(() => {
+    sb.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
+        if (profile) dispatch({ type: 'SET_USER', user: profile })
+        else dispatch({ type: 'AUTH_LOADED' })
+        await fetchWorkspace(dispatch)
+      } else {
+        dispatch({ type: 'AUTH_LOADED' })
+      }
+    })
+
+    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        dispatch({ type: 'LOGOUT' })
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
+        if (profile) dispatch({ type: 'SET_USER', user: profile })
+        await fetchWorkspace(dispatch)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>
+}
+
+async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
+  try {
+    const data = await loadWorkspace()
+    // Auto-seed demo data if this is a fresh workspace
+    if (data.clients.length === 0) {
+      const seeded = await seedDemoData()
+      if (seeded) {
+        const fresh = await loadWorkspace()
+        dispatch({ type: 'SET_WORKSPACE', clients: fresh.clients, planItems: fresh.planItems, tasks: fresh.tasks, deals: fresh.deals, users: fresh.profiles })
+        return
+      }
+    }
+    dispatch({ type: 'SET_WORKSPACE', clients: data.clients, planItems: data.planItems, tasks: data.tasks, deals: data.deals, users: data.profiles })
+  } catch (e) {
+    console.error('fetchWorkspace', e)
+  }
 }
 
 export function useApp() {
@@ -173,5 +204,47 @@ export function useToast() {
   return useCallback((msg: string) => {
     dispatch({ type: 'SHOW_TOAST', msg })
     setTimeout(() => dispatch({ type: 'CLEAR_TOAST' }), 3200)
+  }, [dispatch])
+}
+
+// ── Supabase-synced mutation hooks ────────────────────────────────────────────
+
+export function useUpsertPlanItem() {
+  const { dispatch } = useApp()
+  return useCallback(async (item: PlanItem) => {
+    dispatch({ type: 'UPSERT_PLAN_ITEM', item })
+    await dbUpsertPlanItem(item)
+  }, [dispatch])
+}
+
+export function useDeletePlanItem() {
+  const { dispatch } = useApp()
+  return useCallback(async (id: string) => {
+    dispatch({ type: 'DELETE_PLAN_ITEM', id })
+    await dbDeletePlanItem(id)
+  }, [dispatch])
+}
+
+export function useUpsertClient() {
+  const { dispatch } = useApp()
+  return useCallback(async (client: Client) => {
+    dispatch({ type: 'UPSERT_CLIENT', client })
+    await dbUpsertClient(client)
+  }, [dispatch])
+}
+
+export function useUpsertTask() {
+  const { dispatch } = useApp()
+  return useCallback(async (task: Task) => {
+    dispatch({ type: 'UPSERT_TASK', task })
+    await dbUpsertTask(task)
+  }, [dispatch])
+}
+
+export function useUpsertDeal() {
+  const { dispatch } = useApp()
+  return useCallback(async (deal: Deal) => {
+    dispatch({ type: 'UPSERT_DEAL', deal })
+    await dbUpsertDeal(deal)
   }, [dispatch])
 }

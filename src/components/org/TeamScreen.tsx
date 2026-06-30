@@ -24,6 +24,8 @@ export default function TeamScreen() {
       color: form.color,
       title: form.title,
       role: form.role,
+      permissions: [] as string[],
+      created_at: new Date().toISOString(),
     }
     dispatch({ type: 'UPSERT_USER', user })
     toast(`${form.name} added to team`)

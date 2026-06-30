@@ -1,8 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { useApp, useToast } from '@/lib/store'
+import { useApp, useToast, useUpsertPlanItem } from '@/lib/store'
 import { ChevronLeft, ChevronRight, Planner } from '@/components/ui/Icon'
-import { STATUS_PIPE, SEED_CLIENTS, SEED_TEAM } from '@/lib/seed-data'
+import { STATUS_PIPE } from '@/lib/seed-data'
 import type { PlanItem, ContentStatus } from '@/types'
 
 function parseMonth(key: string) {
@@ -39,6 +39,7 @@ const CLIENT_COLORS: Record<string, string> = {
 export default function ContentCalendar() {
   const { state, dispatch } = useApp()
   const toast = useToast()
+  const upsertPlanItem = useUpsertPlanItem()
   const [monthKey, setMonthKey] = useState('2026-5')
   const [calClient, setCalClient] = useState('all')
   const [weekFilter, setWeekFilter] = useState<'today'|'w1'|'w2'|'w3'|'w4'|'w5'|'month'>('today')
@@ -79,7 +80,7 @@ export default function ContentCalendar() {
   function moveStatus(id: string, status: ContentStatus) {
     const item = state.planItems.find(x => x.id === id)
     if (!item) return
-    dispatch({ type: 'UPSERT_PLAN_ITEM', item: { ...item, status } })
+    upsertPlanItem({ ...item, status })
     toast(`Moved to ${STATUS_PIPE.find(s => s.key === status)?.label}`)
   }
 
@@ -102,8 +103,8 @@ export default function ContentCalendar() {
     return { label:`${diff}d left`, c:'var(--c-muted)', bg:'var(--c-fill)', overdue:false }
   }
 
-  const person = (id: string) => SEED_TEAM.find(t => t.id === id) || { name:'Unassigned', initials:'?', color:'#9A9E94' }
-  const clientFor = (id: string) => SEED_CLIENTS.find(c => c.id === id) || SEED_CLIENTS[0]
+  const person = (id: string) => state.users.find(t => t.id === id) || { name:'Unassigned', initials:'?', color:'#9A9E94' }
+  const clientFor = (id: string) => state.clients.find(c => c.id === id) || state.clients[0] || { name:'Client', color:'#ccc', initials:'C' }
   const detailItem = detailId ? state.planItems.find(it => it.id === detailId) : null
 
   const typeColor = (it: PlanItem) => {
@@ -165,7 +166,7 @@ export default function ContentCalendar() {
           <select value={calClient} onChange={e => setCalClient(e.target.value)}
             style={{ appearance:'none', WebkitAppearance:'none', background:'#fff', border:'1.5px solid var(--c-border)', borderRadius:11, padding:'9px 36px 9px 13px', fontSize:13.5, fontWeight:600, color:'var(--c-ink)', cursor:'pointer' }}>
             <option value="all">All clients</option>
-            {SEED_CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {state.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-faint)" strokeWidth="2.2" strokeLinecap="round" style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path d="m6 9 6 6 6-6"/></svg>
         </div>

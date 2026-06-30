@@ -41,7 +41,7 @@ const NAV = [
   },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
   const { state, dispatch } = useApp()
   const role = state.currentUser?.role || 'employee'
 
@@ -106,7 +106,7 @@ export default function Sidebar() {
               <div style={{ fontSize:13.5, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{state.currentUser.name}</div>
               <div style={{ fontSize:11.5, color:'var(--c-faint)', textTransform:'capitalize' }}>{state.currentUser.role}</div>
             </div>
-            <button onClick={() => dispatch({ type:'LOGOUT' })} title="Sign out"
+            <button onClick={onLogout || (() => dispatch({ type:'LOGOUT' }))} title="Sign out"
               style={{ width:30, height:30, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--c-ghost)' }}
               onMouseEnter={e => { e.currentTarget.style.background='var(--c-fill)'; e.currentTarget.style.color='var(--c-muted)' }}
               onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--c-ghost)' }}

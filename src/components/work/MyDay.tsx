@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { Sparkle, ArrowRight, Plus, X, Check } from '@/components/ui/Icon'
-import { SEED_CLIENTS } from '@/lib/seed-data'
 
 const TASKS_SEED = [
   { id:'t1', clientId:'sunso', clientColor:'#F4B740', title:'Reel — "Glow ritual" 3-step routine', type:'Reel', due:'2:00 PM', est:'2.5h', priority:'High' as const, format:'Reel · 9:16 · 15–25s', hook:'"The 3-step glow ritual you\'re skipping" — open on the before/after texture macro.', idea:'Soft editorial pacing, warm gradients, lots of whitespace. End on a clean product CTA card.', refs:[{label:'Glossier — routine reel'},{label:'Saved: editorial skincare grid'}] },
@@ -30,14 +29,14 @@ export default function MyDay() {
   const dateStr = `${days[now.getDay()]}, ${mos[now.getMonth()]} ${now.getDate()}`
 
   const tasks = TASKS_SEED
-  const clientName = (id: string) => SEED_CLIENTS.find(c => c.id === id)?.name || id
+  const clientName = (id: string) => state.clients.find(c => c.id === id)?.name || id
 
   function createTask() {
     toast('Task created & assigned')
     setCreateOpen(false)
   }
 
-  if (role === 'owner') return <OwnerView name={name} greeting={greeting} dateStr={dateStr} dispatch={dispatch} />
+  if (role === 'owner') return <OwnerView name={name} greeting={greeting} dateStr={dateStr} dispatch={dispatch} clients={state.clients} />
   if (role === 'manager') return <ManagerView name={name} greeting={greeting} dateStr={dateStr} dispatch={dispatch} />
 
   return (
@@ -220,7 +219,7 @@ export default function MyDay() {
                 <div>
                   <label style={{ display:'block', fontSize:12.5, fontWeight:600, color:'var(--c-muted)', marginBottom:7 }}>Client</label>
                   <select value={nw.clientId} onChange={e => setNw(n=>({...n,clientId:e.target.value}))} style={{ width:'100%', background:'var(--c-fill-soft)', border:'1.5px solid var(--c-border)', borderRadius:11, padding:'12px 14px', fontSize:14 }}>
-                    {SEED_CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {state.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -253,8 +252,7 @@ export default function MyDay() {
   )
 }
 
-function OwnerView({ name, greeting, dateStr, dispatch }: any) {
-  const clients = SEED_CLIENTS
+function OwnerView({ name, greeting, dateStr, dispatch, clients }: { name: string; greeting: string; dateStr: string; dispatch: any; clients: any[] }) {
   return (
     <div style={{ animation:'fadeIn .4s ease both' }}>
       <div style={{ marginBottom:26 }}>
