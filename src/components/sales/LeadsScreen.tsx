@@ -176,9 +176,12 @@ export default function LeadsScreen() {
         const sc = SCORE_STYLE[lead.score]
         const st = STATUS_STYLE[lead.lead_status] || STATUS_STYLE.new
         return (
-          <div onClick={() => { setSelected(null); setAiPitch('') }} className="modal-overlay">
+          <>
+            {/* Backdrop — only covers the content area, not the sidebar */}
+            <div onClick={() => { setSelected(null); setAiPitch('') }}
+              style={{ position: 'fixed', top: 0, left: 224, right: 0, bottom: 0, zIndex: 999, background: 'rgba(15,23,42,.28)', backdropFilter: 'blur(1px)', animation: 'fadeIn .18s ease both' }} />
             <div onClick={e => e.stopPropagation()}
-              style={{ position: 'fixed', top: 0, right: 0, width: 460, height: '100vh', background: '#fff', boxShadow: '-8px 0 40px rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column', animation: 'slideInRight .22s ease both' }}>
+              style={{ position: 'fixed', top: 0, right: 0, width: 460, height: '100vh', background: '#fff', boxShadow: '-8px 0 40px rgba(0,0,0,.14)', display: 'flex', flexDirection: 'column', animation: 'slideInRight .22s ease both', zIndex: 1000 }}>
 
               {/* Drawer header */}
               <div style={{ padding: '20px 24px 18px', borderBottom: '1px solid var(--c-border-soft)' }}>
@@ -307,7 +310,7 @@ export default function LeadsScreen() {
                 </button>
               </div>
             </div>
-          </div>
+          </>
         )
       })()}
 
