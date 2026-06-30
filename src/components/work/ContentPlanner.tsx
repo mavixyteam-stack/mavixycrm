@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react'
-import { useApp, useToast } from '@/lib/store'
+import { useApp, useToast, useUpsertPlanItem, useDeletePlanItem } from '@/lib/store'
 import { Plus, X, Sparkle, Spinner, Check } from '@/components/ui/Icon'
 import { SERVICE_CATS, TYPE_MAP, EFFORT_LABELS, IDEA_BANK, BRIEF_BANK, STATUS_PIPE } from '@/lib/seed-data'
 import type { PlanItem, ContentCat, ContentStatus } from '@/types'
@@ -41,8 +41,10 @@ interface ModalState {
 }
 
 export default function ContentPlanner() {
-  const { state, dispatch } = useApp()
+  const { state } = useApp()
   const toast = useToast()
+  const upsertPlanItem = useUpsertPlanItem()
+  const deletePlanItem = useDeletePlanItem()
   const [monthOff, setMonthOff] = useState(0)
   const [monthAutoSet, setMonthAutoSet] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
@@ -88,7 +90,7 @@ export default function ContentPlanner() {
 
   function closeModal() { setModal(m => ({ ...m, open: false, item: null })) }
 
-  function saveItem() {
+  async function saveItem() {
     if (!modal.item?.title?.trim()) return
     const item: PlanItem = {
       id: modal.item!.id || `item-${Date.now()}`,
@@ -105,12 +107,12 @@ export default function ContentPlanner() {
       status: modal.item!.status || 'planned',
       created_at: modal.item!.created_at || new Date().toISOString(),
     }
-    dispatch({ type: 'UPSERT_PLAN_ITEM', item })
+    await upsertPlanItem(item)
     toast(modal.item!.id ? 'Deliverable updated' : 'Deliverable added')
     closeModal()
   }
 
-  function deleteItem(id: string) { dispatch({ type: 'DELETE_PLAN_ITEM', id }); toast('Deleted') }
+  function deleteItem(id: string) { deletePlanItem(id); toast('Deleted') }
 
   async function aiQuickSuggest() {
     if (!modal.item) return
@@ -134,9 +136,9 @@ export default function ContentPlanner() {
     } catch { toast('AI suggestion unavailable') } finally { setAiLoading(false) }
   }
 
-  function assignItem(assignee_id: string) {
+  async function assignItem(assignee_id: string) {
     if (!pushItem) return
-    dispatch({ type: 'UPSERT_PLAN_ITEM', item: { ...pushItem, assignee_id, status: 'planned' as ContentStatus } })
+    await upsertPlanItem({ ...pushItem, assignee_id, status: 'planned' as ContentStatus })
     setPushItem(null)
     toast(`Assigned to ${state.users.find(u => u.id === assignee_id)?.name || 'teammate'}`)
   }
