@@ -21,6 +21,7 @@ import PermissionsScreen from '@/components/org/PermissionsScreen'
 import ConnectionsScreen from '@/components/org/ConnectionsScreen'
 import AutomationsScreen from '@/components/org/AutomationsScreen'
 import KnowledgeScreen from '@/components/org/KnowledgeScreen'
+import AttendanceScreen from '@/components/org/AttendanceScreen'
 import { Sparkle } from '@/components/ui/Icon'
 import type { Screen, Role } from '@/types'
 
@@ -30,19 +31,19 @@ const ROLE_SCREENS: Record<Role, Screen[]> = {
     'myday','planner','calendar','contentplan',
     'clients','client-detail','reports','inbox',
     'pipeline','leads',
-    'team','performance','permissions','connections','automations','knowledge',
+    'team','performance','permissions','connections','automations','knowledge','attendance',
   ],
   manager: [
     'myday','planner','calendar','contentplan',
     'clients','client-detail','reports','inbox',
     'pipeline','leads',
-    'team','performance','knowledge',
+    'team','performance','knowledge','attendance',
   ],
   sales: [
-    'myday','inbox','clients','client-detail','reports','pipeline','leads',
+    'myday','inbox','clients','client-detail','reports','pipeline','leads','attendance',
   ],
   employee: [
-    'myday','planner','calendar','contentplan','inbox','knowledge',
+    'myday','planner','calendar','contentplan','inbox','knowledge','attendance',
   ],
 }
 
@@ -124,6 +125,7 @@ function AppShell() {
       case 'connections': return <ConnectionsScreen />
       case 'automations': return <AutomationsScreen />
       case 'knowledge':   return <KnowledgeScreen />
+      case 'attendance':  return <AttendanceScreen />
       default:            return <MyDay />
     }
   }

@@ -1,6 +1,6 @@
 'use client'
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { Screen, Profile, PlanItem, Task, AttendanceRecord, Deal, Client } from '@/types'
+import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client } from '@/types'
 import { SEED_CLIENTS, SEED_TEAM } from './seed-data'
 import { createClient } from './supabase/client'
 import {
@@ -19,6 +19,7 @@ interface AppState {
   planItems: PlanItem[]
   tasks: Task[]
   attendance: AttendanceRecord[]
+  attendanceRequests: AttendanceRequest[]
   deals: Deal[]
   selectedClientId: string | null
   toast: string | null
@@ -54,6 +55,8 @@ type Action =
   | { type: 'SET_DEALS'; deals: Deal[] }
   | { type: 'UPSERT_DEAL'; deal: Deal }
   | { type: 'SET_ATTENDANCE'; attendance: AttendanceRecord[] }
+  | { type: 'UPSERT_ATT_REQUEST'; request: AttendanceRequest }
+  | { type: 'UPDATE_ATT_REQUEST'; id: string; status: 'approved' | 'rejected'; reviewed_by: string; rejection_reason?: string }
   | { type: 'SHOW_TOAST'; msg: string }
   | { type: 'CLEAR_TOAST' }
   | { type: 'TOGGLE_BRIEF' }
@@ -77,6 +80,7 @@ const initial: AppState = {
   planItems: [],
   tasks: [],
   attendance: [],
+  attendanceRequests: [],
   deals: [],
   selectedClientId: null,
   toast: null,
@@ -126,6 +130,15 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_DEALS': return { ...state, deals: action.deals }
     case 'UPSERT_DEAL': return { ...state, deals: upsert(state.deals, action.deal) }
     case 'SET_ATTENDANCE': return { ...state, attendance: action.attendance }
+    case 'UPSERT_ATT_REQUEST': return { ...state, attendanceRequests: upsert(state.attendanceRequests, action.request) }
+    case 'UPDATE_ATT_REQUEST': return {
+      ...state,
+      attendanceRequests: state.attendanceRequests.map(r =>
+        r.id === action.id
+          ? { ...r, status: action.status, reviewed_by: action.reviewed_by, reviewed_at: new Date().toISOString(), rejection_reason: action.rejection_reason }
+          : r
+      ),
+    }
     case 'SHOW_TOAST': return { ...state, toast: action.msg }
     case 'CLEAR_TOAST': return { ...state, toast: null }
     case 'TOGGLE_BRIEF': return { ...state, briefOpen: !state.briefOpen }
@@ -247,5 +260,19 @@ export function useUpsertDeal() {
   return useCallback(async (deal: Deal) => {
     dispatch({ type: 'UPSERT_DEAL', deal })
     await dbUpsertDeal(deal)
+  }, [dispatch])
+}
+
+export function useUpsertAttendanceRequest() {
+  const { dispatch } = useApp()
+  return useCallback((request: AttendanceRequest) => {
+    dispatch({ type: 'UPSERT_ATT_REQUEST', request })
+  }, [dispatch])
+}
+
+export function useUpdateAttendanceRequest() {
+  const { dispatch } = useApp()
+  return useCallback((id: string, status: 'approved' | 'rejected', reviewed_by: string, rejection_reason?: string) => {
+    dispatch({ type: 'UPDATE_ATT_REQUEST', id, status, reviewed_by, rejection_reason })
   }, [dispatch])
 }

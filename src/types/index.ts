@@ -7,6 +7,7 @@ export type Screen =
   | 'clients' | 'client-detail' | 'reports' | 'inbox' | 'onboarding'
   | 'pipeline' | 'leads'
   | 'team' | 'permissions' | 'performance' | 'connections' | 'automations' | 'knowledge'
+  | 'attendance'
 
 export interface Profile {
   id: string
@@ -85,6 +86,26 @@ export interface AttendanceRecord {
   check_in: string | null
   check_out: string | null
   break_minutes: number
+  created_at: string
+}
+
+export type LeaveType = 'sick' | 'casual' | 'annual' | 'wfh'
+export type RequestStatus = 'pending' | 'approved' | 'rejected'
+
+export interface AttendanceRequest {
+  id: string
+  user_id: string
+  type: 'correction' | 'leave'
+  date: string                  // for correction: the day; for leave: start date
+  leave_end?: string            // for leave: end date
+  leave_type?: LeaveType
+  check_in?: string             // for correction
+  check_out?: string            // for correction
+  reason: string
+  status: RequestStatus
+  reviewed_by?: string
+  reviewed_at?: string
+  rejection_reason?: string
   created_at: string
 }
 
