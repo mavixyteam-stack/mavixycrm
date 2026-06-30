@@ -49,6 +49,7 @@ type Action =
   | { type: 'UPSERT_TASK'; task: Task }
   | { type: 'SET_CLIENTS'; clients: Client[] }
   | { type: 'UPSERT_CLIENT'; client: Client }
+  | { type: 'DELETE_CLIENT'; id: string }
   | { type: 'SET_USERS'; users: Profile[] }
   | { type: 'UPSERT_USER'; user: Profile }
   | { type: 'DELETE_USER'; id: string }
@@ -124,6 +125,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPSERT_TASK': return { ...state, tasks: upsert(state.tasks, action.task) }
     case 'SET_CLIENTS': return { ...state, clients: action.clients }
     case 'UPSERT_CLIENT': return { ...state, clients: upsert(state.clients, action.client) }
+    case 'DELETE_CLIENT': return { ...state, clients: state.clients.filter(x => x.id !== action.id), selectedClientId: state.selectedClientId === action.id ? null : state.selectedClientId }
     case 'SET_USERS': return { ...state, users: action.users }
     case 'UPSERT_USER': return { ...state, users: upsert(state.users, action.user) }
     case 'DELETE_USER': return { ...state, users: state.users.filter(x => x.id !== action.id) }
@@ -236,6 +238,13 @@ export function useDeletePlanItem() {
   return useCallback(async (id: string) => {
     dispatch({ type: 'DELETE_PLAN_ITEM', id })
     await dbDeletePlanItem(id)
+  }, [dispatch])
+}
+
+export function useDeleteClient() {
+  const { dispatch } = useApp()
+  return useCallback((id: string) => {
+    dispatch({ type: 'DELETE_CLIENT', id })
   }, [dispatch])
 }
 
