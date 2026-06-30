@@ -45,12 +45,13 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
   const { state, dispatch } = useApp()
   const role = state.currentUser?.role || 'employee'
 
-  const allowed = (id: string) => {
-    if (role === 'owner') return true
-    if (role === 'manager') return !['permissions','connections','automations'].includes(id)
-    if (role === 'sales') return ['myday','pipeline','leads','clients'].includes(id)
-    return ['myday','planner','calendar','contentplan'].includes(id)
+  const ROLE_SCREENS: Record<string, string[]> = {
+    owner:    ['myday','planner','calendar','contentplan','clients','client-detail','reports','inbox','pipeline','leads','team','performance','permissions','connections','automations','knowledge'],
+    manager:  ['myday','planner','calendar','contentplan','clients','client-detail','reports','inbox','pipeline','leads','team','performance','knowledge'],
+    sales:    ['myday','inbox','clients','client-detail','reports','pipeline','leads'],
+    employee: ['myday','planner','calendar','contentplan','inbox','knowledge'],
   }
+  const allowed = (id: string) => (ROLE_SCREENS[role] || ROLE_SCREENS.employee).includes(id)
 
   const nav = (screen: Screen) => dispatch({ type:'SET_SCREEN', screen })
 
