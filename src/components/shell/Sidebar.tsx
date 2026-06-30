@@ -14,9 +14,9 @@ const NAV = [
     ]
   },
   {
-    group: 'Clients',
+    group: 'Accounts',
     items: [
-      { id:'clients', label:'Accounts', Icon: Building },
+      { id:'clients', label:'Clients', Icon: Building },
       { id:'reports', label:'Reports', Icon: FileText },
       { id:'inbox', label:'Inbox', Icon: Inbox },
     ]
@@ -29,11 +29,11 @@ const NAV = [
     ]
   },
   {
-    group: 'Organisation',
+    group: 'Org',
     items: [
       { id:'team', label:'Team', Icon: Users },
       { id:'performance', label:'Performance', Icon: BarChart },
-      { id:'permissions', label:'Permissions', Icon: Settings },
+      { id:'permissions', label:'Users & Permissions', Icon: Settings },
       { id:'connections', label:'Connections', Icon: Globe },
       { id:'automations', label:'Automations', Icon: Zap },
       { id:'knowledge', label:'Knowledge', Icon: Book },
@@ -52,38 +52,38 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
     employee: ['myday','planner','calendar','contentplan','inbox','knowledge'],
   }
   const allowed = (id: string) => (ROLE_SCREENS[role] || ROLE_SCREENS.employee).includes(id)
-
   const nav = (screen: Screen) => dispatch({ type:'SET_SCREEN', screen })
 
   return (
-    <div style={{ width:232, flexShrink:0, background:'#fff', borderRight:'1px solid var(--c-border)', display:'flex', flexDirection:'column', height:'100vh', position:'sticky', top:0 }}>
+    <div style={{ width:224, flexShrink:0, background:'#fff', borderRight:'1px solid var(--c-border)', display:'flex', flexDirection:'column', height:'100vh', position:'sticky', top:0 }}>
       {/* Logo */}
-      <div style={{ padding:'20px 18px 16px', borderBottom:'1px solid var(--c-border-soft)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:34, height:34, borderRadius:10, background:'var(--c-ink)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <Sparkle size={16} color="#FF5C1F" style={{ animation:'sparkleSpin 8s linear infinite' }} />
+      <div style={{ padding:'18px 16px 14px', borderBottom:'1px solid var(--c-border-soft)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+          <div style={{ width:32, height:32, borderRadius:9, background:'#0F172A', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, position:'relative', overflow:'hidden' }}>
+            <Sparkle size={15} color="#FF5C1F" style={{ animation:'sparkleSpin 8s linear infinite', position:'relative', zIndex:1 }} />
+            <div style={{ position:'absolute', inset:0, background:'radial-gradient(circle at 50% 50%, rgba(255,92,31,0.15), transparent 70%)' }} />
           </div>
-          <div>
-            <div style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:16, letterSpacing:'-0.01em', lineHeight:1 }}>Mavixy OS</div>
-            <div style={{ fontSize:11, color:'var(--c-faint)', marginTop:2 }}>Agency Command Center</div>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ fontFamily:'var(--font-display)', fontWeight:800, fontSize:17, letterSpacing:'-0.03em', color:'#0F172A' }}>mavixy</span>
+            <span style={{ fontSize:10, fontWeight:700, color:'#fff', background:'#FF5C1F', borderRadius:5, padding:'2px 6px', letterSpacing:'.04em' }}>OS</span>
           </div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav style={{ flex:1, overflowY:'auto', padding:'10px 10px' }}>
+      <nav style={{ flex:1, overflowY:'auto', padding:'8px 8px' }}>
         {NAV.map(section => {
           const visible = section.items.filter(item => allowed(item.id))
           if (!visible.length) return null
           return (
-            <div key={section.group} style={{ marginBottom:4 }}>
-              <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:'.08em', color:'var(--c-ghost)', textTransform:'uppercase', padding:'8px 10px 4px' }}>{section.group}</div>
+            <div key={section.group} style={{ marginBottom:2 }}>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:'.1em', color:'var(--c-ghost)', textTransform:'uppercase', padding:'10px 10px 4px' }}>{section.group}</div>
               {visible.map(item => {
                 const active = state.screen === item.id
                 return (
                   <button key={item.id} onClick={() => nav(item.id as Screen)}
-                    style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'9px 11px', borderRadius:10, fontSize:13.5, fontWeight: active ? 600 : 500, color: active ? 'var(--c-ink)' : 'var(--c-muted)', background: active ? 'var(--c-fill)' : 'transparent', transition:'background .15s, color .15s', cursor:'pointer', marginBottom:1 }}
-                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background='var(--c-fill)'; e.currentTarget.style.color='var(--c-ink-2)' } }}
+                    style={{ display:'flex', alignItems:'center', gap:9, width:'100%', padding:'8px 10px', borderRadius:9, fontSize:13.5, fontWeight: active ? 600 : 500, color: active ? '#0F172A' : 'var(--c-muted)', background: active ? 'var(--c-fill)' : 'transparent', borderLeft: active ? '2.5px solid var(--c-accent)' : '2.5px solid transparent', transition:'all .15s', cursor:'pointer', marginBottom:1 }}
+                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background='var(--c-fill)'; e.currentTarget.style.color='#0F172A' } }}
                     onMouseLeave={e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--c-muted)' } }}
                   >
                     <span style={{ color: active ? 'var(--c-accent)' : 'var(--c-faint)', display:'flex', flexShrink:0 }}><item.Icon /></span>
@@ -97,22 +97,22 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
       </nav>
 
       {/* User */}
-      <div style={{ padding:'12px 12px', borderTop:'1px solid var(--c-border-soft)' }}>
+      <div style={{ padding:'10px 10px', borderTop:'1px solid var(--c-border-soft)' }}>
         {state.currentUser && (
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:34, height:34, borderRadius:9, background: state.currentUser.color || '#0EA5A4', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:12, flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 4px' }}>
+            <div style={{ width:32, height:32, borderRadius:9, background: state.currentUser.color || '#0EA5A4', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:11, flexShrink:0 }}>
               {state.currentUser.initials}
             </div>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:13.5, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{state.currentUser.name}</div>
-              <div style={{ fontSize:11.5, color:'var(--c-faint)', textTransform:'capitalize' }}>{state.currentUser.role}</div>
+              <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:'#0F172A' }}>{state.currentUser.name}</div>
+              <div style={{ fontSize:11, color:'var(--c-faint)', textTransform:'capitalize' }}>{state.currentUser.role}</div>
             </div>
             <button onClick={onLogout || (() => dispatch({ type:'LOGOUT' }))} title="Sign out"
-              style={{ width:30, height:30, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--c-ghost)' }}
+              style={{ width:28, height:28, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--c-ghost)', flexShrink:0 }}
               onMouseEnter={e => { e.currentTarget.style.background='var(--c-fill)'; e.currentTarget.style.color='var(--c-muted)' }}
               onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--c-ghost)' }}
             >
-              <LogOut size={14} />
+              <LogOut size={13} />
             </button>
           </div>
         )}
