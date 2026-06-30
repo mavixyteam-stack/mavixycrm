@@ -6,6 +6,7 @@ import { SERVICE_CATS, TYPE_MAP, EFFORT_LABELS, IDEA_BANK, BRIEF_BANK, STATUS_PI
 import type { PlanItem, ContentCat, ContentStatus } from '@/types'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const WEEKDAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 function getMonthKey(offset = 0) {
   const d = new Date()
@@ -16,6 +17,20 @@ function getMonthKey(offset = 0) {
 function parseMonthKey(key: string) {
   const [y, m] = key.split('-').map(Number)
   return { y, m, label: `${MONTHS[m - 1]} ${y}` }
+}
+
+function formatDay(day: number | null, monthKey: string): string {
+  if (!day) return ''
+  const { y, m } = parseMonthKey(monthKey)
+  const d = new Date(y, m - 1, day)
+  return `${WEEKDAYS[d.getDay()]} ${MONTHS[m - 1]} ${day}`
+}
+
+function clientBadge(items: PlanItem[]) {
+  if (items.length === 0) return { label: 'To plan', c: '#6B7280', bg: 'var(--c-fill)' }
+  const allAssigned = items.every(i => i.assignee_id)
+  if (allAssigned) return { label: 'Scheduled', c: '#16A34A', bg: '#F0FDF4' }
+  return { label: 'To push', c: '#FF5C1F', bg: '#FFF1EA' }
 }
 
 interface ModalState {
@@ -29,7 +44,7 @@ export default function ContentPlanner() {
   const { state, dispatch } = useApp()
   const toast = useToast()
   const [monthOff, setMonthOff] = useState(0)
-  const [catFilter, setCatFilter] = useState<string>('all')
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>({ open: false, item: null, clientId: '', cat: 'social' })
   const [pushItem, setPushItem] = useState<PlanItem | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
@@ -39,22 +54,27 @@ export default function ContentPlanner() {
   const { label: monthLabel } = parseMonthKey(monthKey)
   const items = state.planItems.filter(it => it.month === monthKey)
 
+  const activeClientId = selectedClientId || state.clients[0]?.id || null
+  const activeClient = state.clients.find(c => c.id === activeClientId)
+
+  const totalEffort = items.reduce((s, i) => s + i.effort, 0)
+  const unassigned = items.filter(i => !i.assignee_id).length
+  const assigned = items.filter(i => i.assignee_id).length
+  const clientsWithItems = new Set(items.map(i => i.client_id)).size
+
+  const activeItems = items.filter(it => it.client_id === activeClientId)
+  const activeEffort = activeItems.reduce((s, i) => s + i.effort, 0)
+  const activeCats = activeClient ? SERVICE_CATS.filter(c => activeClient.services.includes(c.key)) : []
+
   function openAdd(clientId: string, cat: ContentCat) {
-    setModal({
-      open: true,
-      item: { client_id: clientId, cat, type: TYPE_MAP[cat][0], title: '', brief: BRIEF_BANK[cat], effort: 3, day: null, status: 'planned', refs: [] },
-      clientId,
-      cat,
-    })
+    setModal({ open: true, item: { client_id: clientId, cat, type: TYPE_MAP[cat][0], title: '', brief: BRIEF_BANK[cat], effort: 3, day: null, status: 'planned', refs: [] }, clientId, cat })
   }
 
   function openEdit(item: PlanItem) {
     setModal({ open: true, item: { ...item }, clientId: item.client_id, cat: item.cat })
   }
 
-  function closeModal() {
-    setModal(m => ({ ...m, open: false, item: null }))
-  }
+  function closeModal() { setModal(m => ({ ...m, open: false, item: null })) }
 
   function saveItem() {
     if (!modal.item?.title?.trim()) return
@@ -78,10 +98,7 @@ export default function ContentPlanner() {
     closeModal()
   }
 
-  function deleteItem(id: string) {
-    dispatch({ type: 'DELETE_PLAN_ITEM', id })
-    toast('Deleted')
-  }
+  function deleteItem(id: string) { dispatch({ type: 'DELETE_PLAN_ITEM', id }); toast('Deleted') }
 
   async function aiQuickSuggest() {
     if (!modal.item) return
@@ -91,205 +108,222 @@ export default function ContentPlanner() {
       const idea = ideas[ideaIdx % Math.max(ideas.length, 1)] || 'Creative content idea for your brand'
       setIdeaIdx(i => i + 1)
       const clientName = state.clients.find(c => c.id === modal.clientId)?.name || 'Client'
-      const title = idea.replace('{brand}', clientName)
-      setModal(m => ({ ...m, item: { ...m.item!, title, brief: BRIEF_BANK[modal.cat] } }))
-    } finally {
-      setAiLoading(false)
-    }
+      setModal(m => ({ ...m, item: { ...m.item!, title: idea.replace('{brand}', clientName), brief: BRIEF_BANK[modal.cat] } }))
+    } finally { setAiLoading(false) }
   }
 
   async function aiDeepSuggest() {
     if (!modal.item) return
     setAiLoading(true)
     try {
-      const res = await fetch('/api/ai/suggest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client: state.clients.find(c => c.id === modal.clientId)?.name,
-          cat: modal.cat,
-          type: modal.item!.type,
-          existing: items.filter(it => it.client_id === modal.clientId).map(it => it.title),
-        })
-      })
+      const res = await fetch('/api/ai/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client: state.clients.find(c => c.id === modal.clientId)?.name, cat: modal.cat, type: modal.item!.type, existing: items.filter(it => it.client_id === modal.clientId).map(it => it.title) }) })
       const { title, brief } = await res.json()
       setModal(m => ({ ...m, item: { ...m.item!, title: title || m.item!.title, brief: brief || m.item!.brief } }))
-    } catch {
-      toast('AI suggestion unavailable')
-    } finally {
-      setAiLoading(false)
-    }
+    } catch { toast('AI suggestion unavailable') } finally { setAiLoading(false) }
   }
 
   function assignItem(assignee_id: string) {
     if (!pushItem) return
-    const updated: PlanItem = { ...pushItem, assignee_id, status: 'planned' as ContentStatus }
-    dispatch({ type: 'UPSERT_PLAN_ITEM', item: updated })
+    dispatch({ type: 'UPSERT_PLAN_ITEM', item: { ...pushItem, assignee_id, status: 'planned' as ContentStatus } })
     setPushItem(null)
-    const name = state.users.find(u => u.id === assignee_id)?.name || 'teammate'
-    toast(`Assigned to ${name}`)
+    toast(`Assigned to ${state.users.find(u => u.id === assignee_id)?.name || 'teammate'}`)
   }
 
-  const cats = catFilter === 'all' ? SERVICE_CATS : SERVICE_CATS.filter(c => c.key === catFilter)
-
-  const totalItems = items.length
-  const doneItems = items.filter(it => it.status === 'published').length
-  const progress = totalItems ? Math.round((doneItems / totalItems) * 100) : 0
-
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', animation: 'fadeIn .4s ease both' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>Content Planner</h1>
-          <p style={{ fontSize: 14, color: 'var(--c-subtle)' }}>Plan, brief and assign all deliverables for the month</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 10, padding: '6px 12px' }}>
-            <button onClick={() => setMonthOff(o => o - 1)} style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, color: 'var(--c-subtle)' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            </button>
-            <span style={{ fontSize: 14, fontWeight: 600, minWidth: 88, textAlign: 'center' }}>{monthLabel}</span>
-            <button onClick={() => setMonthOff(o => o + 1)} style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, color: 'var(--c-subtle)' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: 4, background: 'var(--c-fill)', borderRadius: 9, padding: 3 }}>
-            {[{key:'all',label:'All'},...SERVICE_CATS.map(c=>({key:c.key,label:c.short}))].map(c => (
-              <button key={c.key} onClick={() => setCatFilter(c.key)}
-                style={{ padding: '5px 10px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: catFilter === c.key ? '#fff' : 'transparent', color: catFilter === c.key ? 'var(--c-ink)' : 'var(--c-muted)', boxShadow: catFilter === c.key ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
-                {c.label}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: 'var(--c-faint)', marginBottom: 4 }}>Content Planner · plan, then push to the team</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, letterSpacing: '-0.02em' }}>Plan the month</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#fff', border: '1px solid var(--c-border)', borderRadius: 10, padding: '5px 8px' }}>
+              <button onClick={() => setMonthOff(o => o - 1)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, color: 'var(--c-subtle)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
               </button>
-            ))}
+              <span style={{ fontSize: 14, fontWeight: 600, minWidth: 92, textAlign: 'center' }}>{monthLabel}</span>
+              <button onClick={() => setMonthOff(o => o + 1)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, color: 'var(--c-subtle)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+            <button
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FF5C1F', color: '#fff', borderRadius: 10, padding: '10px 18px', fontWeight: 700, fontSize: 13.5, transition: 'transform .15s', opacity: unassigned === 0 ? 0.5 : 1 }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ''}
+              onClick={() => { const first = items.find(i => !i.assignee_id); if (first) setPushItem(first) }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+              Push & assign · {unassigned}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Month progress */}
-      <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 14, padding: '14px 18px', marginBottom: 22, display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>{monthLabel} progress</span>
-            <span style={{ fontSize: 13, color: 'var(--c-subtle)' }}>{doneItems}/{totalItems} published</span>
+      {/* Summary stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 22 }}>
+        {[
+          { label: 'Clients planned', value: `${clientsWithItems} / ${state.clients.length}`, valueStyle: { fontSize: 26, fontWeight: 700, fontFamily: 'var(--font-display)' } },
+          { label: 'Deliverables', value: items.length, color: '#7C3AED' },
+          { label: 'Effort points', value: totalEffort, color: '#FF5C1F' },
+          { label: 'To assign', value: unassigned, color: unassigned > 0 ? '#FF5C1F' : '#16A34A', sub: assigned > 0 ? `${assigned} already scheduled` : undefined },
+        ].map((s, i) => (
+          <div key={i} style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 14, padding: '16px 18px' }}>
+            <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: (s as any).color || 'var(--c-ink)' }}>
+              {typeof s.value === 'string' ? (
+                <>
+                  <span>{s.value.split('/')[0]}</span>
+                  <span style={{ fontSize: 18, color: 'var(--c-ghost)', fontWeight: 500 }}>/ {s.value.split('/')[1]}</span>
+                </>
+              ) : s.value}
+            </div>
+            {(s as any).sub && <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 2 }}>{(s as any).sub}</div>}
           </div>
-          <div style={{ height: 6, background: 'var(--c-fill)', borderRadius: 99 }}>
-            <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#FF5C1F,#FF9A6C)', width: `${progress}%`, transition: 'width .4s' }} />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 14 }}>
-          {STATUS_PIPE.map(s => {
-            const cnt = items.filter(it => it.status === s.key).length
+        ))}
+      </div>
+
+      {/* Two-panel layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '256px 1fr', gap: 16, alignItems: 'start' }}>
+
+        {/* Left: client list */}
+        <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--c-ghost)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 16px 10px' }}>Clients</div>
+          {state.clients.map(client => {
+            const cItems = items.filter(it => it.client_id === client.id)
+            const pts = cItems.reduce((s, i) => s + i.effort, 0)
+            const badge = clientBadge(cItems)
+            const isActive = client.id === activeClientId
             return (
-              <div key={s.key} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: s.c }}>{cnt}</div>
-                <div style={{ fontSize: 11, color: 'var(--c-faint)' }}>{s.label}</div>
-              </div>
+              <button key={client.id} onClick={() => setSelectedClientId(client.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 14px', background: isActive ? 'rgba(255,92,31,.04)' : 'transparent', borderLeft: `3px solid ${isActive ? 'var(--c-accent)' : 'transparent'}`, borderBottom: '1px solid var(--c-border-soft)', transition: 'background .15s', textAlign: 'left' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: client.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{client.initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: isActive ? 'var(--c-ink)' : 'var(--c-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 1 }}>{cItems.length > 0 ? `${cItems.length} items · ${pts} pts` : 'No work yet'}</div>
+                </div>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: badge.c, background: badge.bg, borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap', flexShrink: 0 }}>{badge.label}</span>
+              </button>
             )
           })}
         </div>
-      </div>
 
-      {/* Client × Category grid */}
-      {state.clients.map(client => {
-        const clientItems = items.filter(it => it.client_id === client.id)
-        if (clientItems.length === 0 && catFilter !== 'all') return null
-
-        return (
-          <div key={client.id} style={{ marginBottom: 24, background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 16, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--c-border-soft)', background: 'var(--c-fill)' }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: client.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12 }}>
-                {client.initials}
-              </div>
+        {/* Right: content detail */}
+        {activeClient ? (
+          <div>
+            {/* Client header */}
+            <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, padding: '18px 22px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: activeClient.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>{activeClient.initials}</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14.5 }}>{client.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--c-faint)' }}>
-                  {clientItems.length} deliverable{clientItems.length !== 1 ? 's' : ''} · {clientItems.filter(i => i.status === 'published').length} published
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{activeClient.name}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {activeCats.map(cat => (
+                    <span key={cat.key} style={{ fontSize: 12, fontWeight: 600, color: cat.color, background: cat.bg, borderRadius: 7, padding: '3px 9px' }}>{cat.label}</span>
+                  ))}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {client.services.map(s => {
-                  const cat = SERVICE_CATS.find(c => c.key === s)
-                  return cat ? (
-                    <span key={s} style={{ fontSize: 11, fontWeight: 600, color: cat.color, background: cat.bg, borderRadius: 6, padding: '3px 7px' }}>{cat.short}</span>
-                  ) : null
-                })}
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700 }}>{activeEffort}</div>
+                <div style={{ fontSize: 12, color: 'var(--c-faint)' }}>effort pts</div>
               </div>
             </div>
 
-            {cats.map(cat => {
-              const catItems = clientItems.filter(it => it.cat === cat.key)
-              const canAdd = client.services.includes(cat.key)
-              if (!canAdd && catItems.length === 0) return null
+            {/* AI Copilot banner */}
+            <div style={{ background: '#0F172A', borderRadius: 14, padding: '13px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Sparkle size={16} color="#FF5C1F" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                You're in control. Copilot can <strong style={{ color: '#fff' }}>draft briefs & suggest inspiration</strong> as you add work — every deliverable is yours to define.
+              </div>
+            </div>
 
+            {/* Category sections */}
+            {activeCats.map(cat => {
+              const catItems = activeItems.filter(it => it.cat === cat.key)
               return (
-                <div key={cat.key} style={{ borderBottom: '1px solid var(--c-border-soft)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px 8px', background: `${cat.bg}66` }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: cat.color, letterSpacing: '.05em', textTransform: 'uppercase' }}>{cat.label}</span>
-                    <span style={{ fontSize: 12, color: 'var(--c-faint)' }}>({catItems.length})</span>
-                    <div style={{ flex: 1 }} />
-                    {canAdd && (
-                      <button onClick={() => openAdd(client.id, cat.key as ContentCat)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: cat.color, padding: '4px 9px', borderRadius: 7, background: cat.bg, border: `1px solid ${cat.color}33` }}>
-                        <Plus size={11} />Add
-                      </button>
-                    )}
+                <div key={cat.key} style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, marginBottom: 14, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: catItems.length > 0 ? '1px solid var(--c-border-soft)' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: cat.color }}>{cat.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-ghost)', background: 'var(--c-fill)', borderRadius: 20, padding: '1px 8px' }}>{catItems.length}</span>
+                    </div>
+                    <button onClick={() => openAdd(activeClient.id, cat.key as ContentCat)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#fff', background: 'var(--c-ink)', padding: '7px 13px', borderRadius: 8 }}>
+                      <Plus size={12} />Add
+                    </button>
                   </div>
 
-                  <div style={{ padding: '8px 18px 12px' }}>
+                  <div style={{ padding: catItems.length > 0 ? '12px 14px 14px' : '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {catItems.length === 0 ? (
-                      <div style={{ fontSize: 13, color: 'var(--c-ghost)', padding: '8px 0', fontStyle: 'italic' }}>No deliverables yet</div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {catItems.map(item => {
-                          const st = STATUS_PIPE.find(s => s.key === item.status)!
-                          const assignee = state.users.find(u => u.id === item.assignee_id)
-                          return (
-                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--c-border-soft)', background: '#fff', transition: 'box-shadow .15s' }}
-                              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,.06)'}
-                              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: st.c, background: st.bg, borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap' }}>{st.label}</span>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
-                                <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 1 }}>{item.type} · Effort: {EFFORT_LABELS[item.effort]}{item.day ? ` · Day ${item.day}` : ''}</div>
-                              </div>
-                              {assignee ? (
-                                <div title={assignee.name} style={{ width: 26, height: 26, borderRadius: '50%', background: assignee.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                  {assignee.initials}
-                                </div>
-                              ) : (
-                                <button onClick={() => setPushItem(item)}
-                                  style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--c-accent)', background: 'rgba(255,92,31,.08)', borderRadius: 7, padding: '4px 8px', whiteSpace: 'nowrap' }}>
-                                  Assign
-                                </button>
-                              )}
-                              <button onClick={() => setPushItem(item)}
-                                style={{ padding: '4px 8px', fontSize: 11.5, fontWeight: 600, color: 'var(--c-subtle)', background: 'var(--c-fill)', borderRadius: 7, whiteSpace: 'nowrap' }}>
-                                Push
-                              </button>
-                              <button onClick={() => openEdit(item)}
-                                style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, color: 'var(--c-ghost)' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--c-fill)'; e.currentTarget.style.color = 'var(--c-subtle)' }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--c-ghost)' }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
-                              </button>
-                              <button onClick={() => deleteItem(item.id)}
-                                style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, color: 'var(--c-ghost)' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--c-red-bg)'; e.currentTarget.style.color = 'var(--c-red)' }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--c-ghost)' }}>
-                                <X size={12} />
-                              </button>
+                      <div style={{ fontSize: 13.5, color: 'var(--c-ghost)', fontStyle: 'italic' }}>No deliverables yet</div>
+                    ) : catItems.map(item => {
+                      const st = STATUS_PIPE.find(s => s.key === item.status)!
+                      const assignee = state.users.find(u => u.id === item.assignee_id)
+                      const dayLabel = formatDay(item.day, monthKey)
+                      const effortColor = item.effort >= 4 ? '#FF5C1F' : item.effort >= 3 ? '#F4B740' : '#0EA5A4'
+                      return (
+                        <div key={item.id} style={{ borderRadius: 12, border: '1px solid var(--c-border-soft)', borderLeft: `3px solid ${cat.color}`, padding: '14px 14px 12px', background: '#fff', transition: 'box-shadow .15s' }}
+                          onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.07)'}
+                          onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+                          {/* Badges row */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1E293B', borderRadius: 6, padding: '3px 8px' }}>{item.type}</span>
+                            {dayLabel && <span style={{ fontSize: 11.5, color: 'var(--c-subtle)' }}>{dayLabel}</span>}
+                            <span style={{ fontSize: 11, fontWeight: 700, color: st.c, background: st.bg, borderRadius: 6, padding: '3px 8px' }}>{st.label}</span>
+                            <div style={{ flex: 1 }} />
+                            {assignee && (
+                              <div title={assignee.name} style={{ width: 26, height: 26, borderRadius: '50%', background: assignee.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{assignee.initials}</div>
+                            )}
+                            <button onClick={() => openEdit(item)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, color: 'var(--c-ghost)' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--c-fill)'; (e.currentTarget as HTMLElement).style.color = 'var(--c-subtle)' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--c-ghost)' }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+                            </button>
+                            <button onClick={() => deleteItem(item.id)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, color: 'var(--c-ghost)' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--c-red-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--c-red)' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--c-ghost)' }}>
+                              <X size={12} />
+                            </button>
+                          </div>
+                          {/* Title */}
+                          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: item.brief ? 6 : 0 }}>{item.title}</div>
+                          {/* Brief */}
+                          {item.brief && (
+                            <div style={{ fontSize: 13, color: 'var(--c-subtle)', lineHeight: 1.55, marginBottom: item.refs?.length ? 8 : 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>{item.brief}</div>
+                          )}
+                          {/* Refs */}
+                          {item.refs && item.refs.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+                              {item.refs.map((r, i) => (
+                                <span key={i} style={{ fontSize: 12, color: 'var(--c-subtle)', background: 'var(--c-fill)', borderRadius: 7, padding: '3px 9px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                  {r.label}
+                                </span>
+                              ))}
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                          )}
+                          {/* Bottom: effort dots + assign */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', gap: 3 }}>
+                              {[1,2,3,4,5].map(n => (
+                                <div key={n} style={{ width: 11, height: 11, borderRadius: 3, background: n <= item.effort ? effortColor : '#E5E7EB', transition: 'background .2s' }} />
+                              ))}
+                            </div>
+                            {!assignee && (
+                              <button onClick={() => setPushItem(item)} style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-accent)', background: 'rgba(255,92,31,.08)', borderRadius: 7, padding: '4px 10px' }}>Assign →</button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )
             })}
           </div>
-        )
-      })}
+        ) : (
+          <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--c-faint)' }}>
+            Select a client to view and plan deliverables
+          </div>
+        )}
+      </div>
 
       {/* Add / Edit Modal */}
       {modal.open && modal.item && (
@@ -298,31 +332,23 @@ export default function ContentPlanner() {
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>{modal.item!.id ? 'Edit Deliverable' : 'Add Deliverable'}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginTop: 2 }}>
-                  {state.clients.find(c => c.id === modal.clientId)?.name} · {SERVICE_CATS.find(c => c.key === modal.cat)?.label}
-                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginTop: 2 }}>{state.clients.find(c => c.id === modal.clientId)?.name} · {SERVICE_CATS.find(c => c.key === modal.cat)?.label}</div>
               </div>
-              <button onClick={closeModal} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, color: 'var(--c-ghost)' }}>
-                <X size={15} />
-              </button>
+              <button onClick={closeModal} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, color: 'var(--c-ghost)' }}><X size={15} /></button>
             </div>
 
             <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* AI Copilot bar */}
+              {/* AI bar */}
               <div style={{ display: 'flex', gap: 8, padding: '10px 12px', background: 'rgba(255,92,31,.05)', borderRadius: 10, border: '1px solid rgba(255,92,31,.15)' }}>
                 <Sparkle size={14} color="#FF5C1F" style={{ marginTop: 1, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-ink)', marginBottom: 6 }}>AI Copilot</div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={aiQuickSuggest} disabled={aiLoading}
-                      style={{ fontSize: 12, fontWeight: 600, color: '#FF5C1F', background: '#fff', border: '1px solid rgba(255,92,31,.25)', borderRadius: 7, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      {aiLoading ? <Spinner size={11} color="#FF5C1F" /> : <Sparkle size={11} color="#FF5C1F" />}
-                      Quick idea
+                    <button onClick={aiQuickSuggest} disabled={aiLoading} style={{ fontSize: 12, fontWeight: 600, color: '#FF5C1F', background: '#fff', border: '1px solid rgba(255,92,31,.25)', borderRadius: 7, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {aiLoading ? <Spinner size={11} color="#FF5C1F" /> : <Sparkle size={11} color="#FF5C1F" />}Quick idea
                     </button>
-                    <button onClick={aiDeepSuggest} disabled={aiLoading}
-                      style={{ fontSize: 12, fontWeight: 600, color: '#FF5C1F', background: '#fff', border: '1px solid rgba(255,92,31,.25)', borderRadius: 7, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Sparkle size={11} color="#FF5C1F" />
-                      Deep suggest (AI)
+                    <button onClick={aiDeepSuggest} disabled={aiLoading} style={{ fontSize: 12, fontWeight: 600, color: '#FF5C1F', background: '#fff', border: '1px solid rgba(255,92,31,.25)', borderRadius: 7, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Sparkle size={11} color="#FF5C1F" />Deep suggest (AI)
                     </button>
                   </div>
                 </div>
@@ -334,7 +360,7 @@ export default function ContentPlanner() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                   {TYPE_MAP[modal.cat].map(t => (
                     <button key={t} onClick={() => setModal(m => ({ ...m, item: { ...m.item!, type: t } }))}
-                      style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 11px', borderRadius: 8, border: '1.5px solid', borderColor: modal.item!.type === t ? 'var(--c-accent)' : 'var(--c-border)', color: modal.item!.type === t ? 'var(--c-accent)' : 'var(--c-muted)', background: modal.item!.type === t ? 'rgba(255,92,31,.06)' : '#fff', transition: 'all .12s' }}>
+                      style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 11px', borderRadius: 8, border: '1.5px solid', borderColor: modal.item!.type === t ? 'var(--c-accent)' : 'var(--c-border)', color: modal.item!.type === t ? 'var(--c-accent)' : 'var(--c-muted)', background: modal.item!.type === t ? 'rgba(255,92,31,.06)' : '#fff' }}>
                       {t}
                     </button>
                   ))}
@@ -344,11 +370,9 @@ export default function ContentPlanner() {
               {/* Title */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Title</label>
-                <input value={modal.item!.title || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, title: e.target.value } }))}
-                  placeholder="e.g. Glow ritual — 3-step routine"
-                  style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, transition: 'border-color .15s' }}
-                  onFocus={e => e.target.style.borderColor = 'var(--c-ink)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
+                <input value={modal.item!.title || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, title: e.target.value } }))} placeholder="e.g. Glow ritual — 3-step routine"
+                  style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }}
+                  onFocus={e => e.target.style.borderColor = 'var(--c-ink)'} onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
               </div>
 
               {/* Brief */}
@@ -356,9 +380,8 @@ export default function ContentPlanner() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Brief</label>
                 <textarea value={modal.item!.brief || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, brief: e.target.value } }))}
                   rows={3} placeholder="Describe the content direction, references, key elements..."
-                  style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, resize: 'vertical', transition: 'border-color .15s' }}
-                  onFocus={e => e.target.style.borderColor = 'var(--c-ink)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
+                  style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, resize: 'vertical' }}
+                  onFocus={e => e.target.style.borderColor = 'var(--c-ink)'} onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
               </div>
 
               {/* Effort + Day */}
@@ -378,8 +401,20 @@ export default function ContentPlanner() {
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Scheduled Day (optional)</label>
                   <input type="number" min={1} max={31} value={modal.item!.day || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, day: e.target.value ? Number(e.target.value) : null } }))}
-                    placeholder="e.g. 14"
-                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }} />
+                    placeholder="e.g. 14" style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }} />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Status</label>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {STATUS_PIPE.map(s => (
+                    <button key={s.key} onClick={() => setModal(m => ({ ...m, item: { ...m.item!, status: s.key as ContentStatus } }))}
+                      style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 11px', borderRadius: 8, border: '1.5px solid', borderColor: modal.item!.status === s.key ? s.c : 'var(--c-border)', color: modal.item!.status === s.key ? s.c : 'var(--c-muted)', background: modal.item!.status === s.key ? s.bg : '#fff' }}>
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -428,11 +463,9 @@ export default function ContentPlanner() {
                 {state.users.map(u => (
                   <button key={u.id} onClick={() => assignItem(u.id)}
                     style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border)', background: '#fff', transition: 'all .15s', textAlign: 'left' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--c-accent)'; e.currentTarget.style.background = 'rgba(255,92,31,.04)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--c-border)'; e.currentTarget.style.background = '#fff' }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, flexShrink: 0 }}>
-                      {u.initials}
-                    </div>
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--c-accent)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,92,31,.04)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--c-border)'; (e.currentTarget as HTMLElement).style.background = '#fff' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 9, background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{u.initials}</div>
                     <div>
                       <div style={{ fontSize: 13.5, fontWeight: 600 }}>{u.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--c-faint)' }}>{u.title}</div>
