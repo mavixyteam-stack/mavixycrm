@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useApp, useToast } from '@/lib/store'
-import { Sparkle, Bell, Search, Clock, Spinner, Check, X, ChevronDown } from '@/components/ui/Icon'
+import { Sparkle, Bell, Search, Clock, Spinner, Check, X } from '@/components/ui/Icon'
 
 export default function TopBar() {
   const { state, dispatch } = useApp()
@@ -74,8 +74,6 @@ export default function TopBar() {
   function checkOut() { dispatch({ type:'CHECK_OUT' }); toast(`Checked out — ${workingTime} logged`) }
 
   const notifCount = 3
-  const role = state.currentUser?.role || 'employee'
-  const roleLabel = role.charAt(0).toUpperCase() + role.slice(1)
 
   return (
     <>
@@ -149,22 +147,6 @@ export default function TopBar() {
           )}
         </button>
 
-        {/* User avatar + role */}
-        {state.currentUser && (
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', borderRadius:11, border:'1.5px solid var(--c-border)', background:'#fff', cursor:'pointer', transition:'background .15s' }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--c-fill)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='#fff'}
-          >
-            <div style={{ width:28, height:28, borderRadius:8, background: state.currentUser.color || '#FF5C1F', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:10, flexShrink:0 }}>
-              {state.currentUser.initials}
-            </div>
-            <div>
-              <div style={{ fontSize:10, color:'var(--c-faint)', fontWeight:600, letterSpacing:'.04em', lineHeight:1.2 }}>VIEWING AS</div>
-              <div style={{ fontSize:12.5, fontWeight:700, color:'#0F172A', lineHeight:1.2 }}>{roleLabel}</div>
-            </div>
-            <ChevronDown size={13} color="var(--c-faint)" />
-          </div>
-        )}
       </div>
 
       {/* Morning Brief Modal */}
