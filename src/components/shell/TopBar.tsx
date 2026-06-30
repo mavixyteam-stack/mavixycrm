@@ -22,13 +22,14 @@ export default function TopBar() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [state.checkedIn])
 
-  function workingTime() {
+  const workingTime = (() => {
     if (!state.checkInTime) return '0:00'
-    const ms = Date.now() - state.checkInTime.getTime() - state.totalBreakMs - (state.onBreak && state.breakStart ? Date.now() - state.breakStart.getTime() : 0)
+    const now = Date.now()
+    const ms = now - state.checkInTime.getTime() - state.totalBreakMs - (state.onBreak && state.breakStart ? now - state.breakStart.getTime() : 0)
     const s = Math.floor(ms / 1000)
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
     return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}` : `${m}:${String(sec).padStart(2,'0')}`
-  }
+  })()
 
   async function generateBrief() {
     setBriefLoading(true)
@@ -78,9 +79,8 @@ export default function TopBar() {
     toast('Break ended — timer resumed')
   }
   function checkOut() {
-    const wt = workingTime()
     dispatch({ type:'CHECK_OUT' })
-    toast(`Checked out — ${wt} logged`)
+    toast(`Checked out — ${workingTime} logged`)
   }
 
   const notifCount = 3
@@ -125,7 +125,7 @@ export default function TopBar() {
                 <div style={{ width:7, height:7, borderRadius:'50%', background:'var(--c-green)', position:'relative' }}>
                   <div style={{ position:'absolute', inset:-3, borderRadius:'50%', border:'2px solid var(--c-green)', animation:'pulseRing 1.5s ease-out infinite', opacity:.5 }} />
                 </div>
-                {workingTime()}
+                {workingTime}
               </div>
               {state.onBreak ? (
                 <button onClick={endBreak} style={{ fontSize:11.5, fontWeight:600, color:'var(--c-amber)', padding:'4px 8px', borderRadius:7, background:'var(--c-amber-bg)' }}>Resume</button>
