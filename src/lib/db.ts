@@ -6,18 +6,21 @@ import type { PlanItem, Task, Deal, Client } from '@/types'
 
 export async function loadWorkspace() {
   const sb = createClient()
+  const today = new Date().toISOString().split('T')[0]
   const [
     { data: clients },
     { data: planItems },
     { data: tasks },
     { data: deals },
     { data: profiles },
+    { data: attendance },
   ] = await Promise.all([
     sb.from('clients').select('*').order('created_at'),
     sb.from('plan_items').select('*').order('created_at'),
     sb.from('tasks').select('*').order('created_at'),
     sb.from('deals').select('*').order('created_at'),
     sb.from('profiles').select('*').order('created_at'),
+    sb.from('attendance').select('*').eq('date', today),
   ])
   return {
     clients: clients || [],
@@ -25,6 +28,7 @@ export async function loadWorkspace() {
     tasks: tasks || [],
     deals: deals || [],
     profiles: profiles || [],
+    attendance: attendance || [],
   }
 }
 

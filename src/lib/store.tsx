@@ -40,7 +40,7 @@ type Action =
   | { type: 'SET_USER'; user: Profile }
   | { type: 'LOGOUT' }
   | { type: 'AUTH_LOADED' }
-  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[] }
+  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendance: AttendanceRecord[] }
   | { type: 'SET_PLAN_ITEMS'; items: PlanItem[] }
   | { type: 'UPSERT_PLAN_ITEM'; item: PlanItem }
   | { type: 'DELETE_PLAN_ITEM'; id: string }
@@ -111,6 +111,7 @@ function reducer(state: AppState, action: Action): AppState {
       tasks: action.tasks,
       deals: action.deals,
       users: action.users.length ? action.users : state.users,
+      attendance: action.attendance,
     }
     case 'SET_PLAN_ITEMS': return { ...state, planItems: action.items }
     case 'UPSERT_PLAN_ITEM': return { ...state, planItems: upsert(state.planItems, action.item) }
@@ -183,11 +184,11 @@ async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
       const seeded = await seedDemoData()
       if (seeded) {
         const fresh = await loadWorkspace()
-        dispatch({ type: 'SET_WORKSPACE', clients: fresh.clients, planItems: fresh.planItems, tasks: fresh.tasks, deals: fresh.deals, users: fresh.profiles })
+        dispatch({ type: 'SET_WORKSPACE', clients: fresh.clients, planItems: fresh.planItems, tasks: fresh.tasks, deals: fresh.deals, users: fresh.profiles, attendance: fresh.attendance })
         return
       }
     }
-    dispatch({ type: 'SET_WORKSPACE', clients: data.clients, planItems: data.planItems, tasks: data.tasks, deals: data.deals, users: data.profiles })
+    dispatch({ type: 'SET_WORKSPACE', clients: data.clients, planItems: data.planItems, tasks: data.tasks, deals: data.deals, users: data.profiles, attendance: data.attendance })
   } catch (e) {
     console.error('fetchWorkspace', e)
   }
