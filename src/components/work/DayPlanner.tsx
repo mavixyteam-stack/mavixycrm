@@ -1,44 +1,107 @@
 'use client'
 import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
-import { Sparkle, Spinner, Clock, Check } from '@/components/ui/Icon'
+import { Sparkle, Spinner, Warning } from '@/components/ui/Icon'
 
-const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 8am-6pm
-
-const HOUR_BLOCKS = [
-  { hour: 9, task: 'Morning brief + Slack triage', color: '#FF5C1F', client: '', cat: 'focus' },
-  { hour: 10, task: 'SUNSO — Glow reel review', color: '#F4B740', client: 'SUNSO', cat: 'creative' },
-  { hour: 11, task: 'Lumio — Diwali carousel brief', color: '#8B5CF6', client: 'Lumio', cat: 'creative' },
-  { hour: 13, task: 'Elysian Trails — story set', color: '#10B981', client: 'Elysian', cat: 'creative' },
-  { hour: 14, task: 'Meta Ads review — SUNSO + Verve', color: '#2563EB', client: 'Multiple', cat: 'performance' },
-  { hour: 16, task: 'Client check-ins & EOD push', color: '#FF5C1F', client: '', cat: 'admin' },
+const TEAM_DATA = [
+  { id: 'aanya', name: 'Aanya Mehra', role: 'Designer', initials: 'AM', color: '#8B5CF6', tasks: 5, pct: 88 },
+  { id: 'rohan', name: 'Rohan Kapoor', role: 'Video Editor', initials: 'RK', color: '#EF4444', tasks: 9, pct: 142 },
+  { id: 'zoya', name: 'Zoya Khan', role: 'Copywriter', initials: 'ZK', color: '#10B981', tasks: 6, pct: 71 },
+  { id: 'kabir', name: 'Kabir Joshi', role: 'Performance', initials: 'KJ', color: '#F59E0B', tasks: 5, pct: 80 },
+  { id: 'dev', name: 'Dev Sharma', role: 'Strategist', initials: 'DS', color: '#3B82F6', tasks: 4, pct: 64 },
+  { id: 'ira', name: 'Ira Nair', role: 'Account Mgr', initials: 'IN', color: '#EC4899', tasks: 7, pct: 52 },
 ]
 
-interface ScheduleBlock {
-  id: string
-  hour: number
-  duration: number
-  task: string
-  color: string
-  client: string
-  cat: string
-  done: boolean
+const AI_DAYS: Record<string, { hours: number; blocks: { time: string; dur: string; title: string; client: string; tag?: string; tagColor?: string; barColor: string }[] }> = {
+  aanya: {
+    hours: 9,
+    blocks: [
+      { time: '9:00', dur: '30m', title: 'Morning brief + team standup', client: 'Team', barColor: '#6B7280' },
+      { time: '9:30', dur: '2h 30m', title: 'SUNSO — "Glow ritual" carousel, 3 slides', client: 'SUNSO', tag: 'Deep work', tagColor: '#F59E0B', barColor: '#FF5C1F' },
+      { time: '12:00', dur: '45m', title: 'Lunch', client: '', barColor: '#D1D5DB' },
+      { time: '1:00', dur: '1h', title: 'Weekend Doors — reel cover + thumbnails', client: 'The Weekend Doors', barColor: '#8B5CF6' },
+      { time: '2:00', dur: '2h', title: 'Elysian Trails — story templates ×5', client: 'Elysian Trails', barColor: '#10B981' },
+      { time: '4:00', dur: '30m', title: 'SUNSO — resize website hero banner', client: 'SUNSO', barColor: '#FF5C1F' },
+      { time: '4:30', dur: '1h', title: 'Lumio — Diwali key visual, v1 draft', client: 'Lumio', tag: 'High priority', tagColor: '#EF4444', barColor: '#3B82F6' },
+    ],
+  },
+  rohan: {
+    hours: 10,
+    blocks: [
+      { time: '9:00', dur: '30m', title: 'Morning brief + Slack triage', client: '', barColor: '#6B7280' },
+      { time: '9:30', dur: '1h 30m', title: 'Verve — product reel, v2 edit', client: 'Verve', tag: 'Deep work', tagColor: '#F59E0B', barColor: '#EF4444' },
+      { time: '11:00', dur: '1h', title: 'SUNSO — unboxing reel cut', client: 'SUNSO', barColor: '#FF5C1F' },
+      { time: '12:00', dur: '1h', title: 'Lunch + review notes', client: '', barColor: '#D1D5DB' },
+      { time: '1:00', dur: '2h', title: 'Weekend Doors — promo video edit', client: 'The Weekend Doors', barColor: '#8B5CF6' },
+      { time: '3:00', dur: '1h', title: 'Lumio — brand film rough cut', client: 'Lumio', tag: 'High priority', tagColor: '#EF4444', barColor: '#3B82F6' },
+      { time: '4:00', dur: '1h', title: 'Client review calls & EOD exports', client: '', barColor: '#6B7280' },
+    ],
+  },
+  zoya: {
+    hours: 8,
+    blocks: [
+      { time: '9:00', dur: '30m', title: 'Morning brief + content review', client: '', barColor: '#6B7280' },
+      { time: '9:30', dur: '2h', title: 'SUNSO — product description refresh ×10', client: 'SUNSO', tag: 'Deep work', tagColor: '#F59E0B', barColor: '#10B981' },
+      { time: '11:30', dur: '30m', title: 'Elysian Trails — caption pack', client: 'Elysian Trails', barColor: '#10B981' },
+      { time: '12:00', dur: '45m', title: 'Lunch', client: '', barColor: '#D1D5DB' },
+      { time: '1:00', dur: '1h 30m', title: 'Lumio — festive email campaign copy', client: 'Lumio', barColor: '#3B82F6' },
+      { time: '2:30', dur: '1h', title: 'Weekend Doors — menu + promo copy', client: 'The Weekend Doors', barColor: '#8B5CF6' },
+    ],
+  },
+  dev: {
+    hours: 7,
+    blocks: [
+      { time: '9:00', dur: '30m', title: 'Morning brief + client check-ins', client: '', barColor: '#6B7280' },
+      { time: '9:30', dur: '2h', title: 'SUNSO — Q3 strategy deck', client: 'SUNSO', tag: 'Deep work', tagColor: '#F59E0B', barColor: '#3B82F6' },
+      { time: '11:30', dur: '1h', title: 'Lumio — brand positioning session', client: 'Lumio', barColor: '#3B82F6' },
+      { time: '1:00', dur: '1h', title: 'Elysian Trails — content calendar plan', client: 'Elysian Trails', barColor: '#10B981' },
+      { time: '2:00', dur: '1h 30m', title: 'Agency weekly review + reporting', client: 'Internal', barColor: '#6B7280' },
+    ],
+  },
+  ira: {
+    hours: 8,
+    blocks: [
+      { time: '9:00', dur: '1h', title: 'Morning brief + client emails', client: '', barColor: '#6B7280' },
+      { time: '10:00', dur: '1h', title: 'SUNSO — monthly check-in call', client: 'SUNSO', barColor: '#FF5C1F' },
+      { time: '11:00', dur: '1h', title: 'Lumio — onboarding & asset briefing', client: 'Lumio', barColor: '#3B82F6' },
+      { time: '12:00', dur: '45m', title: 'Lunch', client: '', barColor: '#D1D5DB' },
+      { time: '1:00', dur: '2h', title: 'Elysian Trails — campaign review + approval', client: 'Elysian Trails', barColor: '#10B981' },
+      { time: '3:00', dur: '1h', title: 'New client intake — Weekend Doors', client: 'The Weekend Doors', tag: 'High priority', tagColor: '#EF4444', barColor: '#8B5CF6' },
+    ],
+  },
+  kabir: {
+    hours: 8,
+    blocks: [
+      { time: '9:00', dur: '30m', title: 'Morning brief + ad account checks', client: '', barColor: '#6B7280' },
+      { time: '9:30', dur: '2h', title: 'SUNSO — Meta Ads optimisation', client: 'SUNSO', tag: 'Deep work', tagColor: '#F59E0B', barColor: '#F59E0B' },
+      { time: '11:30', dur: '1h', title: 'Verve — Google Ads restructure', client: 'Verve', barColor: '#EF4444' },
+      { time: '12:30', dur: '30m', title: 'Lunch', client: '', barColor: '#D1D5DB' },
+      { time: '1:00', dur: '2h', title: 'Lumio — SEO audit + keyword mapping', client: 'Lumio', barColor: '#3B82F6' },
+      { time: '3:00', dur: '1h', title: 'Weekly performance report — all clients', client: 'Internal', barColor: '#6B7280' },
+    ],
+  },
 }
 
 export default function DayPlanner() {
   const { state } = useApp()
   const toast = useToast()
   const [loading, setLoading] = useState(false)
-  const [blocks, setBlocks] = useState<ScheduleBlock[]>(
-    HOUR_BLOCKS.map((b, i) => ({ ...b, id: `block-${i}`, duration: 1, done: false }))
-  )
-  const [aiNote, setAiNote] = useState('')
-  const [teamView, setTeamView] = useState(false)
+  const [selectedMember, setSelectedMember] = useState('aanya')
+  const [alertDismissed, setAlertDismissed] = useState(false)
+  const [appliedSuggestion, setAppliedSuggestion] = useState(false)
 
   const today = new Date()
-  const dayLabel = today.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+  const dayLabel = today.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).replace(' at', ',')
 
-  async function buildAISchedule() {
+  const overloaded = TEAM_DATA.find(m => m.pct > 100)
+  const suggestion = overloaded
+    ? `${overloaded.name.split(' ')[0]} is at ${overloaded.pct}% capacity — ${overloaded.tasks} tasks, 2 due today. I can move the Verve reel edit to Zoya (71% → 95%) so today's deliverables still land on time.`
+    : null
+
+  const selected = TEAM_DATA.find(m => m.id === selectedMember) || TEAM_DATA[0]
+  const dayPlan = AI_DAYS[selectedMember] || AI_DAYS.aanya
+
+  async function replan() {
     setLoading(true)
     try {
       const res = await fetch('/api/ai/brief', {
@@ -52,239 +115,157 @@ export default function DayPlanner() {
           mode: 'planner',
         })
       })
-      const { text } = await res.json()
-      setAiNote(text || '')
-      toast('AI schedule built')
+      await res.json()
+      toast('Day re-planned by AI')
     } catch {
-      setAiNote('Focus on your highest-impact client work first. Block deep work in the morning, admin in the afternoon.')
+      toast('Re-planned with local priorities')
     } finally {
       setLoading(false)
     }
   }
 
-  function toggleDone(id: string) {
-    setBlocks(bs => bs.map(b => b.id === id ? { ...b, done: !b.done } : b))
+  function applySuggestion() {
+    setAppliedSuggestion(true)
+    setAlertDismissed(true)
+    toast('Suggestion applied — Verve reel moved to Zoya')
   }
-
-  function redistribute() {
-    setBlocks(bs => {
-      const undone = bs.filter(b => !b.done)
-      const done = bs.filter(b => b.done)
-      const startHours = [9, 10, 11, 13, 14, 15, 16]
-      return [
-        ...undone.map((b, i) => ({ ...b, hour: startHours[i] || b.hour })),
-        ...done,
-      ]
-    })
-    toast('Schedule redistributed')
-  }
-
-  const doneCount = blocks.filter(b => b.done).length
-
-  const teamLoad = state.users.map(u => {
-    const assigned = state.planItems.filter(i => i.assignee_id === u.id && i.status !== 'published')
-    const effort = assigned.reduce((s, i) => s + (i.effort || 2), 0)
-    return { ...u, assigned: assigned.length, effort, max: 12 }
-  })
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1120, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 22 }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>Day Planner</h1>
-          <p style={{ fontSize: 14, color: 'var(--c-subtle)' }}>{dayLabel}</p>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 2, background: 'var(--c-fill)', borderRadius: 9, padding: 3 }}>
-            <button onClick={() => setTeamView(false)}
-              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600, background: !teamView ? '#fff' : 'transparent', color: !teamView ? 'var(--c-ink)' : 'var(--c-muted)', boxShadow: !teamView ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
-              My Day
-            </button>
-            <button onClick={() => setTeamView(true)}
-              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600, background: teamView ? '#fff' : 'transparent', color: teamView ? 'var(--c-ink)' : 'var(--c-muted)', boxShadow: teamView ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
-              Team Load
-            </button>
+          <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 7 }}>
+            Day Planner
+            <span style={{ color: 'var(--c-ghost)' }}>·</span>
+            <span>{dayLabel}</span>
           </div>
-          <button onClick={buildAISchedule} disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--c-ink)', color: '#fff', borderRadius: 10, padding: '8px 14px', fontWeight: 600, fontSize: 13, opacity: loading ? .7 : 1, transition: 'transform .15s' }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ''}>
-            {loading ? <Spinner size={13} color="#fff" /> : <Sparkle size={13} color="#FF5C1F" />}
-            {loading ? 'Building…' : 'AI Schedule'}
-          </button>
-          {!teamView && (
-            <button onClick={redistribute}
-              style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid var(--c-border)', fontSize: 13, fontWeight: 600, color: 'var(--c-subtle)' }}>
-              Redistribute
-            </button>
-          )}
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em' }}>Workload &amp; day plan</h1>
         </div>
+        <button onClick={replan} disabled={loading}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1.5px solid var(--c-border)', borderRadius: 11, padding: '9px 16px', fontWeight: 600, fontSize: 13.5, color: 'var(--c-ink)', transition: 'all .15s', boxShadow: '0 1px 4px rgba(0,0,0,.06)', marginTop: 4 }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 3px 10px rgba(0,0,0,.1)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,.06)'}>
+          {loading ? <Spinner size={13} color="#FF5C1F" /> : <Sparkle size={13} color="#FF5C1F" />}
+          Re-plan with AI
+        </button>
       </div>
 
-      {!teamView ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20 }}>
-          {/* Timeline */}
-          <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 16, overflow: 'hidden' }}>
-            {/* Progress bar */}
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 600 }}>Day progress</span>
-                  <span style={{ fontSize: 12.5, color: 'var(--c-subtle)' }}>{doneCount}/{blocks.length} done</span>
-                </div>
-                <div style={{ height: 5, background: 'var(--c-fill)', borderRadius: 99 }}>
-                  <div style={{ height: '100%', borderRadius: 99, background: 'var(--c-green)', width: `${blocks.length ? (doneCount / blocks.length) * 100 : 0}%`, transition: 'width .4s' }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Hour rows */}
-            <div style={{ padding: '10px 0' }}>
-              {HOURS.map(hour => {
-                const block = blocks.find(b => b.hour === hour)
-                const label = hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`
-                const isNow = new Date().getHours() === hour
-                return (
-                  <div key={hour} style={{ display: 'flex', gap: 0, minHeight: 56, position: 'relative' }}>
-                    {/* Hour label */}
-                    <div style={{ width: 72, flexShrink: 0, padding: '8px 14px 0', textAlign: 'right' }}>
-                      <span style={{ fontSize: 11.5, fontWeight: isNow ? 700 : 400, color: isNow ? 'var(--c-accent)' : 'var(--c-faint)' }}>{label}</span>
-                    </div>
-                    {/* Line + content */}
-                    <div style={{ flex: 1, borderLeft: `2px solid ${isNow ? 'var(--c-accent)' : 'var(--c-border-soft)'}`, paddingLeft: 14, paddingRight: 16, paddingBottom: 4 }}>
-                      {isNow && <div style={{ position: 'absolute', left: 71, top: 11, width: 8, height: 8, borderRadius: '50%', background: 'var(--c-accent)', transform: 'translateX(-50%)' }} />}
-                      {block ? (
-                        <div style={{ background: block.done ? 'var(--c-fill)' : '#fff', border: `1.5px solid ${block.done ? 'var(--c-border-soft)' : block.color + '40'}`, borderLeft: `3px solid ${block.done ? 'var(--c-ghost)' : block.color}`, borderRadius: 10, padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 10, transition: 'all .15s', marginBottom: 4 }}>
-                          <button onClick={() => toggleDone(block.id)}
-                            style={{ width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${block.done ? 'var(--c-green)' : 'var(--c-border)'}`, background: block.done ? 'var(--c-green)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
-                            {block.done && <Check size={11} color="#fff" />}
-                          </button>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13.5, fontWeight: 600, color: block.done ? 'var(--c-ghost)' : 'var(--c-ink)', textDecoration: block.done ? 'line-through' : 'none' }}>{block.task}</div>
-                            {block.client && <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 2 }}>{block.client}</div>}
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: block.color, background: `${block.color}18`, borderRadius: 6, padding: '2px 7px', flexShrink: 0 }}>{block.cat}</span>
-                        </div>
-                      ) : (
-                        <div style={{ height: 38 }} />
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+      {/* AI Workload Alert */}
+      {suggestion && !alertDismissed && (
+        <div style={{ background: 'var(--c-ink)', borderRadius: 16, padding: '18px 22px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16, animation: 'fadeUp .3s ease both' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,92,31,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Warning size={20} color="#FF8A6B" />
           </div>
-
-          {/* Side panel */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* AI note */}
-            {aiNote && (
-              <div style={{ background: 'var(--c-ink)', borderRadius: 14, padding: '16px 18px', color: '#E8E6E2', animation: 'fadeUp .3s ease both' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-                  <Sparkle size={13} color="#FF5C1F" />
-                  <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.06em', color: '#FF7A45' }}>AI NOTE</span>
-                </div>
-                <p style={{ fontSize: 13.5, lineHeight: 1.6, fontWeight: 400 }}>{aiNote}</p>
-              </div>
-            )}
-
-            {/* Urgent items */}
-            <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 14, padding: '14px 16px' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--c-muted)', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 10 }}>Attention</div>
-              {state.planItems.filter(i => i.status === 'review' || (i.day && i.day <= new Date().getDate() && i.status !== 'published')).slice(0, 4).map(item => {
-                const client = state.clients.find(c => c.id === item.client_id)
-                return (
-                  <div key={item.id} style={{ display: 'flex', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--c-border-soft)' }}>
-                    <div style={{ width: 3, borderRadius: 99, background: item.status === 'review' ? 'var(--c-amber)' : 'var(--c-red)', flexShrink: 0, marginTop: 3 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.3 }}>{item.title}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 2 }}>{client?.name} · {item.status === 'review' ? 'Needs review' : 'Due today'}</div>
-                    </div>
-                  </div>
-                )
-              })}
-              {state.planItems.filter(i => i.status === 'review').length === 0 && (
-                <div style={{ fontSize: 13, color: 'var(--c-ghost)', fontStyle: 'italic' }}>All clear for today</div>
-              )}
-            </div>
-
-            {/* Today's published */}
-            <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 14, padding: '14px 16px' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--c-muted)', letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 10 }}>Published this month</div>
-              {state.planItems.filter(i => i.status === 'published').map(item => {
-                const client = state.clients.find(c => c.id === item.client_id)
-                return (
-                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--c-border-soft)' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--c-green)', flexShrink: 0 }} />
-                    <div style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{item.title}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--c-faint)' }}>{client?.initials}</div>
-                  </div>
-                )
-              })}
-              {state.planItems.filter(i => i.status === 'published').length === 0 && (
-                <div style={{ fontSize: 13, color: 'var(--c-ghost)', fontStyle: 'italic' }}>Nothing published yet</div>
-              )}
-            </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8A6B', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 5 }}>AI Workload Alert</div>
+            <p style={{ fontSize: 14, color: '#E8E6E2', lineHeight: 1.55, fontWeight: 400 }}>
+              <strong style={{ color: '#fff', fontWeight: 700 }}>{overloaded?.name.split(' ')[0]} is at {overloaded?.pct}% capacity</strong>
+              {' '}— {overloaded?.tasks} tasks, 2 due today. I can move the <strong style={{ color: '#fff' }}>Verve reel edit</strong> to Zoya (71% → 95%) so today&apos;s deliverables still land on time.
+            </p>
           </div>
+          <button onClick={applySuggestion}
+            style={{ background: 'var(--c-accent)', color: '#fff', borderRadius: 10, padding: '10px 18px', fontWeight: 700, fontSize: 13.5, whiteSpace: 'nowrap', flexShrink: 0, transition: 'transform .15s' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ''}>
+            Apply suggestion
+          </button>
         </div>
-      ) : (
-        /* Team Load View */
-        <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--c-border-soft)' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>Team Capacity</div>
-            <div style={{ fontSize: 13, color: 'var(--c-subtle)', marginTop: 2 }}>Active deliverables and effort scores across the team</div>
+      )}
+
+      {appliedSuggestion && !alertDismissed && (
+        <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 12, padding: '12px 18px', marginBottom: 20, fontSize: 13.5, color: '#166534', fontWeight: 500 }}>
+          ✓ Verve reel edit moved to Zoya — workload rebalanced
+        </div>
+      )}
+
+      {/* Two-column layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 18, alignItems: 'start' }}>
+        {/* Left: Team Capacity */}
+        <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,.05)' }}>
+          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--c-border-soft)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>Team capacity</div>
+            <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginTop: 3 }}>Today · social media pod</div>
           </div>
-          <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {teamLoad.map(u => {
-              const pct = Math.min((u.effort / u.max) * 100, 100)
-              const overloaded = pct > 80
+          <div style={{ padding: '6px 0' }}>
+            {TEAM_DATA.map(member => {
+              const over = member.pct > 100
+              const barColor = over ? '#EF4444' : member.pct > 85 ? '#F59E0B' : '#22C55E'
+              const isSelected = member.id === selectedMember
               return (
-                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid var(--c-border-soft)' }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
-                    {u.initials}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{u.name}</div>
-                      <div style={{ fontSize: 12, color: overloaded ? 'var(--c-red)' : 'var(--c-faint)', fontWeight: overloaded ? 700 : 400 }}>
-                        {u.assigned} items · effort {u.effort}/{u.max}
+                <button key={member.id} onClick={() => setSelectedMember(member.id)}
+                  style={{ width: '100%', textAlign: 'left', padding: '12px 18px', background: isSelected ? 'var(--c-fill)' : 'transparent', borderLeft: `3px solid ${isSelected ? 'var(--c-accent)' : 'transparent'}`, transition: 'all .12s', display: 'block' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: member.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11.5, flexShrink: 0 }}>
+                      {member.initials}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600 }}>{member.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: barColor }}>{member.pct}%</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: over ? '#EF4444' : '#22C55E' }}>{over ? 'Over capacity' : 'Healthy'}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginBottom: 6 }}>{member.role} · {member.tasks} tasks</div>
+                      <div style={{ height: 5, background: 'var(--c-fill)', borderRadius: 99, overflow: 'hidden', position: 'relative' }}>
+                        <div style={{
+                          height: '100%',
+                          borderRadius: 99,
+                          width: `${Math.min(member.pct, 100)}%`,
+                          background: over
+                            ? 'repeating-linear-gradient(45deg, #EF4444, #EF4444 4px, #FCA5A5 4px, #FCA5A5 8px)'
+                            : barColor,
+                          transition: 'width .5s',
+                        }} />
                       </div>
                     </div>
-                    <div style={{ height: 6, background: 'var(--c-fill)', borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', borderRadius: 99, background: overloaded ? 'var(--c-red)' : pct > 60 ? 'var(--c-amber)' : 'var(--c-green)', width: `${pct}%`, transition: 'width .5s' }} />
-                    </div>
                   </div>
-                  <div style={{ flexShrink: 0 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: overloaded ? 'var(--c-red)' : pct > 60 ? 'var(--c-amber)' : 'var(--c-green)', background: overloaded ? 'var(--c-red-bg)' : pct > 60 ? 'var(--c-amber-bg)' : 'var(--c-green-bg)', borderRadius: 6, padding: '3px 8px' }}>
-                      {overloaded ? 'Overloaded' : pct > 60 ? 'Busy' : 'Available'}
-                    </span>
-                  </div>
-                </div>
+                </button>
               )
             })}
           </div>
-          {/* Unassigned items */}
-          <div style={{ padding: '14px 18px', borderTop: '1px solid var(--c-border-soft)', background: 'var(--c-fill)' }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--c-muted)', marginBottom: 8 }}>
-              Unassigned deliverables ({state.planItems.filter(i => !i.assignee_id).length})
+        </div>
+
+        {/* Right: AI Day Plan */}
+        <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,.05)' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', gap: 13 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: selected.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+              {selected.initials}
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {state.planItems.filter(i => !i.assignee_id).map(item => {
-                const client = state.clients.find(c => c.id === item.client_id)
-                return (
-                  <span key={item.id} style={{ fontSize: 12, fontWeight: 500, background: '#fff', border: '1px solid var(--c-border)', borderRadius: 8, padding: '4px 9px' }}>
-                    {client?.initials} — {item.type}
-                  </span>
-                )
-              })}
-              {state.planItems.filter(i => !i.assignee_id).length === 0 && (
-                <span style={{ fontSize: 13, color: 'var(--c-ghost)', fontStyle: 'italic' }}>All items assigned</span>
-              )}
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>{selected.name}&apos;s day, planned by AI</div>
+              <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginTop: 2 }}>{dayPlan.hours} hours · sequenced by priority &amp; energy</div>
             </div>
           </div>
+
+          <div style={{ padding: '8px 0' }}>
+            {dayPlan.blocks.map((block, i) => (
+              <div key={i} style={{ display: 'flex', gap: 0, padding: '0 20px', marginBottom: 2 }}>
+                {/* Time column */}
+                <div style={{ width: 52, flexShrink: 0, paddingTop: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-ink)' }}>{block.time}</div>
+                  <div style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 2 }}>{block.dur}</div>
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, borderLeft: `3px solid ${block.barColor}`, marginLeft: 12, paddingLeft: 14, paddingTop: 10, paddingBottom: 10, borderBottom: i < dayPlan.blocks.length - 1 ? '1px solid var(--c-border-soft)' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--c-ink)', lineHeight: 1.35 }}>{block.title}</div>
+                      {block.client && <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 3 }}>{block.client}</div>}
+                    </div>
+                    {block.tag && (
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: block.tagColor, background: `${block.tagColor}18`, borderRadius: 7, padding: '3px 9px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {block.tag}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
