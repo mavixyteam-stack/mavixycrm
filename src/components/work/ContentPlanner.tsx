@@ -3,14 +3,15 @@ import React, { useState } from 'react'
 import { useApp, useToast, useUpsertPlanItem, useDeletePlanItem } from '@/lib/store'
 import { Plus, X, Sparkle, Spinner, Check } from '@/components/ui/Icon'
 import { SERVICE_CATS, TYPE_MAP, EFFORT_LABELS, IDEA_BANK, BRIEF_BANK, STATUS_PIPE } from '@/lib/seed-data'
-import type { PlanItem, ContentCat, ContentStatus } from '@/types'
+import { schedule, skillScore, weekOf, calcWorkStart } from '@/lib/scheduler'
+import type { PlanItem, ContentCat, ContentStatus, Profile } from '@/types'
+import type { ScheduleRow } from '@/lib/scheduler'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const WEEKDAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 function getMonthKey(offset = 0) {
-  const d = new Date()
-  d.setMonth(d.getMonth() + offset)
+  const d = new Date(); d.setMonth(d.getMonth() + offset)
   return `${d.getFullYear()}-${d.getMonth() + 1}`
 }
 
@@ -23,14 +24,22 @@ function formatDay(day: number | null, monthKey: string): string {
   if (!day) return ''
   const { y, m } = parseMonthKey(monthKey)
   const d = new Date(y, m - 1, day)
-  return `${WEEKDAYS[d.getDay()]} ${MONTHS[m - 1]} ${day}`
+  return `${WEEKDAYS[d.getDay()]} ${day}`
 }
 
 function clientBadge(items: PlanItem[]) {
   if (items.length === 0) return { label: 'To plan', c: '#6B7280', bg: 'var(--c-fill)' }
-  const allAssigned = items.every(i => i.assignee_id)
+  const allAssigned = items.every(i => i.assignee_id && i.day)
   if (allAssigned) return { label: 'Scheduled', c: '#16A34A', bg: '#F0FDF4' }
+  const anyAssigned = items.some(i => i.assignee_id)
+  if (anyAssigned) return { label: 'Partial', c: '#F59E0B', bg: '#FFFBEB' }
   return { label: 'To push', c: '#FF5C1F', bg: '#FFF1EA' }
+}
+
+function scoreBar(score: number) {
+  if (score >= 0.9) return { label: 'Ideal match', color: '#10B981', bg: '#ECFDF5' }
+  if (score >= 0.65) return { label: 'Good match', color: '#F59E0B', bg: '#FFFBEB' }
+  return { label: 'Out of specialty', color: '#EF4444', bg: '#FEF2F2' }
 }
 
 interface ModalState {
@@ -48,21 +57,22 @@ export default function ContentPlanner() {
   const [monthOff, setMonthOff] = useState(0)
   const [monthAutoSet, setMonthAutoSet] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
-
-  // Once plan items load, jump to the month that has data if current has none
-  React.useEffect(() => {
-    if (monthAutoSet || state.planItems.length === 0) return
-    const cur = getMonthKey(0)
-    const prev = getMonthKey(-1)
-    if (!state.planItems.some(i => i.month === cur) && state.planItems.some(i => i.month === prev)) {
-      setMonthOff(-1)
-    }
-    setMonthAutoSet(true)
-  }, [state.planItems, monthAutoSet])
   const [modal, setModal] = useState<ModalState>({ open: false, item: null, clientId: '', cat: 'social' })
-  const [pushItem, setPushItem] = useState<PlanItem | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [ideaIdx, setIdeaIdx] = useState(0)
+
+  // Smart schedule state
+  const [schedOpen, setSchedOpen] = useState(false)
+  const [schedRows, setSchedRows] = useState<ScheduleRow[]>([])
+  const [schedScope, setSchedScope] = useState<'all' | 'client'>('client')
+  const [schedSaving, setSchedSaving] = useState(false)
+
+  React.useEffect(() => {
+    if (monthAutoSet || state.planItems.length === 0) return
+    const cur = getMonthKey(0), prev = getMonthKey(-1)
+    if (!state.planItems.some(i => i.month === cur) && state.planItems.some(i => i.month === prev)) setMonthOff(-1)
+    setMonthAutoSet(true)
+  }, [state.planItems, monthAutoSet])
 
   const monthKey = getMonthKey(monthOff)
   const { label: monthLabel } = parseMonthKey(monthKey)
@@ -70,24 +80,87 @@ export default function ContentPlanner() {
 
   const activeClientId = selectedClientId || state.clients[0]?.id || null
   const activeClient = state.clients.find(c => c.id === activeClientId)
-
-  const totalEffort = items.reduce((s, i) => s + i.effort, 0)
-  const unassigned = items.filter(i => !i.assignee_id).length
-  const assigned = items.filter(i => i.assignee_id).length
-  const clientsWithItems = new Set(items.map(i => i.client_id)).size
-
   const activeItems = items.filter(it => it.client_id === activeClientId)
-  const activeEffort = activeItems.reduce((s, i) => s + i.effort, 0)
   const activeCats = activeClient ? SERVICE_CATS.filter(c => activeClient.services.includes(c.key)) : []
 
+  const totalEffort = items.reduce((s, i) => s + i.effort, 0)
+  const unassigned = items.filter(i => !i.assignee_id || !i.day).length
+  const assigned = items.filter(i => i.assignee_id && i.day).length
+
+  // ── Open smart schedule modal ──────────────────────────────────────────────
+  function openScheduler(scope: 'all' | 'client') {
+    const target = scope === 'client'
+      ? activeItems.filter(i => !i.assignee_id || !i.day)
+      : items.filter(i => !i.assignee_id || !i.day)
+
+    if (target.length === 0) { toast('All items are already scheduled!'); return }
+
+    const rows = schedule(target, state.users, monthKey)
+    setSchedRows(rows)
+    setSchedScope(scope)
+    setSchedOpen(true)
+  }
+
+  // Override a single row's assignee in the preview
+  function overrideAssignee(rowIdx: number, user: Profile) {
+    setSchedRows(rows => rows.map((r, i) => {
+      if (i !== rowIdx) return r
+      const { score, reason } = skillScore(r.item.type, user.title || '')
+      const workStart = calcWorkStart(r.postingDay, r.item.effort)
+      const weekNum = weekOf(workStart)
+      const postWeek = weekOf(r.postingDay)
+      return {
+        ...r,
+        assignee: user,
+        skillScore: score,
+        skillReason: reason,
+        workStartDay: workStart,
+        weekLabel: weekNum !== postWeek ? `Week ${weekNum} → Week ${postWeek}` : `Week ${postWeek}`,
+        overrides: true,
+      }
+    }))
+  }
+
+  // Override posting day in preview
+  function overridePostDay(rowIdx: number, day: number) {
+    setSchedRows(rows => rows.map((r, i) => {
+      if (i !== rowIdx) return r
+      const workStart = calcWorkStart(day, r.item.effort)
+      const weekNum = weekOf(workStart)
+      const postWeek = weekOf(day)
+      return {
+        ...r,
+        postingDay: day,
+        deadlineDay: Math.max(workStart, day - 2),
+        workStartDay: workStart,
+        weekLabel: weekNum !== postWeek ? `Week ${weekNum} → Week ${postWeek}` : `Week ${postWeek}`,
+        overrides: true,
+      }
+    }))
+  }
+
+  async function confirmSchedule() {
+    setSchedSaving(true)
+    for (const row of schedRows) {
+      await upsertPlanItem({
+        ...row.item,
+        assignee_id: row.assignee.id,
+        day: row.postingDay,
+        status: 'planned',
+      })
+    }
+    setSchedSaving(false)
+    setSchedOpen(false)
+    toast(`Scheduled ${schedRows.length} deliverable${schedRows.length !== 1 ? 's' : ''} — team is notified`)
+  }
+
+  // ── Add / Edit ─────────────────────────────────────────────────────────────
   function openAdd(clientId: string, cat: ContentCat) {
     setModal({ open: true, item: { client_id: clientId, cat, type: TYPE_MAP[cat][0], title: '', brief: BRIEF_BANK[cat], effort: 3, day: null, status: 'planned', refs: [] }, clientId, cat })
   }
-
   function openEdit(item: PlanItem) {
     setModal({ open: true, item: { ...item }, clientId: item.client_id, cat: item.cat })
   }
-
   function closeModal() { setModal(m => ({ ...m, open: false, item: null })) }
 
   async function saveItem() {
@@ -136,15 +209,9 @@ export default function ContentPlanner() {
     } catch { toast('AI suggestion unavailable') } finally { setAiLoading(false) }
   }
 
-  async function assignItem(assignee_id: string) {
-    if (!pushItem) return
-    await upsertPlanItem({ ...pushItem, assignee_id, status: 'planned' as ContentStatus })
-    setPushItem(null)
-    toast(`Assigned to ${state.users.find(u => u.id === assignee_id)?.name || 'teammate'}`)
-  }
-
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', animation: 'fadeIn .4s ease both' }}>
+
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 13, color: 'var(--c-faint)', marginBottom: 4 }}>Content Planner · plan, then push to the team</div>
@@ -160,42 +227,39 @@ export default function ContentPlanner() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
               </button>
             </div>
-            <button
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FF5C1F', color: '#fff', borderRadius: 10, padding: '10px 18px', fontWeight: 700, fontSize: 13.5, transition: 'transform .15s', opacity: unassigned === 0 ? 0.5 : 1 }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ''}
-              onClick={() => { const first = items.find(i => !i.assignee_id); if (first) setPushItem(first) }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-              Push & assign · {unassigned}
+            <button onClick={() => openScheduler('all')} disabled={unassigned === 0}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: unassigned > 0 ? '#FF5C1F' : '#10B981', color: '#fff', borderRadius: 10, padding: '10px 18px', fontWeight: 700, fontSize: 13.5, transition: 'transform .15s, background .2s', opacity: unassigned === 0 ? 0.85 : 1 }}
+              onMouseEnter={e => { if (unassigned > 0) (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ''}>
+              {unassigned === 0
+                ? <><Check size={14} color="#fff" />All scheduled</>
+                : <><Sparkle size={14} color="#fff" />Smart schedule · {unassigned}</>
+              }
             </button>
           </div>
         </div>
       </div>
 
-      {/* Summary stats */}
+      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Clients planned', value: `${clientsWithItems} / ${state.clients.length}`, valueStyle: { fontSize: 26, fontWeight: 700, fontFamily: 'var(--font-display)' } },
+          { label: 'Clients planned', value: `${new Set(items.map(i => i.client_id)).size} / ${state.clients.length}`, color: 'var(--c-ink)' },
           { label: 'Deliverables', value: items.length, color: '#7C3AED' },
           { label: 'Effort points', value: totalEffort, color: '#FF5C1F' },
-          { label: 'To assign', value: unassigned, color: unassigned > 0 ? '#FF5C1F' : '#16A34A', sub: assigned > 0 ? `${assigned} already scheduled` : undefined },
+          { label: assigned > 0 ? 'Scheduled' : 'To schedule', value: assigned > 0 ? `${assigned} / ${items.length}` : unassigned, color: unassigned > 0 ? '#FF5C1F' : '#16A34A' },
         ].map((s, i) => (
           <div key={i} style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 14, padding: '16px 18px' }}>
             <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginBottom: 6 }}>{s.label}</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: (s as any).color || 'var(--c-ink)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: s.color }}>
               {typeof s.value === 'string' ? (
-                <>
-                  <span>{s.value.split('/')[0]}</span>
-                  <span style={{ fontSize: 18, color: 'var(--c-ghost)', fontWeight: 500 }}>/ {s.value.split('/')[1]}</span>
-                </>
+                <>{s.value.split('/')[0]}<span style={{ fontSize: 18, color: 'var(--c-ghost)', fontWeight: 500 }}>/ {s.value.split('/')[1]}</span></>
               ) : s.value}
             </div>
-            {(s as any).sub && <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 2 }}>{(s as any).sub}</div>}
           </div>
         ))}
       </div>
 
-      {/* Two-panel layout */}
+      {/* Two-panel */}
       <div style={{ display: 'grid', gridTemplateColumns: '256px 1fr', gap: 16, alignItems: 'start' }}>
 
         {/* Left: client list */}
@@ -203,7 +267,6 @@ export default function ContentPlanner() {
           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--c-ghost)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 16px 10px' }}>Clients</div>
           {state.clients.map(client => {
             const cItems = items.filter(it => it.client_id === client.id)
-            const pts = cItems.reduce((s, i) => s + i.effort, 0)
             const badge = clientBadge(cItems)
             const isActive = client.id === activeClientId
             return (
@@ -212,7 +275,7 @@ export default function ContentPlanner() {
                 <div style={{ width: 34, height: 34, borderRadius: 9, background: client.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{client.initials}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: isActive ? 'var(--c-ink)' : 'var(--c-ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 1 }}>{cItems.length > 0 ? `${cItems.length} items · ${pts} pts` : 'No work yet'}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 1 }}>{cItems.length > 0 ? `${cItems.length} items · ${cItems.reduce((s,i) => s+i.effort,0)} pts` : 'No work yet'}</div>
                 </div>
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: badge.c, background: badge.bg, borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap', flexShrink: 0 }}>{badge.label}</span>
               </button>
@@ -220,7 +283,7 @@ export default function ContentPlanner() {
           })}
         </div>
 
-        {/* Right: content detail */}
+        {/* Right: active client content */}
         {activeClient ? (
           <div>
             {/* Client header */}
@@ -234,9 +297,19 @@ export default function ContentPlanner() {
                   ))}
                 </div>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700 }}>{activeEffort}</div>
-                <div style={{ fontSize: 12, color: 'var(--c-faint)' }}>effort pts</div>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                {activeItems.filter(i => !i.assignee_id || !i.day).length > 0 && (
+                  <button onClick={() => openScheduler('client')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,92,31,.1)', color: 'var(--c-accent)', borderRadius: 9, padding: '8px 14px', fontWeight: 700, fontSize: 13, border: '1.5px solid rgba(255,92,31,.2)', transition: 'all .15s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,92,31,.15)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,92,31,.1)' }}>
+                    <Sparkle size={13} color="#FF5C1F" />Schedule this client
+                  </button>
+                )}
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700 }}>{activeItems.reduce((s,i) => s+i.effort, 0)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--c-faint)' }}>effort pts</div>
+                </div>
               </div>
             </div>
 
@@ -244,11 +317,11 @@ export default function ContentPlanner() {
             <div style={{ background: '#0F172A', borderRadius: 14, padding: '13px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
               <Sparkle size={16} color="#FF5C1F" style={{ flexShrink: 0 }} />
               <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
-                You're in control. Copilot can <strong style={{ color: '#fff' }}>draft briefs & suggest inspiration</strong> as you add work — every deliverable is yours to define.
+                Copilot can <strong style={{ color: '#fff' }}>draft briefs & auto-schedule the full month</strong> — it matches tasks to the right person, schedules work in the week before posting, and leaves approval time.
               </div>
             </div>
 
-            {/* Category sections */}
+            {/* Content sections */}
             {activeCats.map(cat => {
               const catItems = activeItems.filter(it => it.cat === cat.key)
               return (
@@ -263,32 +336,37 @@ export default function ContentPlanner() {
                       <Plus size={12} />Add
                     </button>
                   </div>
-
                   <div style={{ padding: catItems.length > 0 ? '12px 14px 14px' : '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {catItems.length === 0 ? (
                       <div style={{ fontSize: 13.5, color: 'var(--c-ghost)', fontStyle: 'italic' }}>No deliverables yet</div>
                     ) : catItems.map(item => {
                       const st = STATUS_PIPE.find(s => s.key === item.status)!
                       const assignee = state.users.find(u => u.id === item.assignee_id)
-                      const dayLabel = formatDay(item.day, monthKey)
                       const effortColor = item.effort >= 4 ? '#FF5C1F' : item.effort >= 3 ? '#F4B740' : '#0EA5A4'
+                      const isScheduled = !!(item.assignee_id && item.day)
+
                       return (
-                        <div key={item.id} style={{ borderRadius: 12, border: '1px solid var(--c-border-soft)', borderLeft: `3px solid ${cat.color}`, padding: '14px 14px 12px', background: '#fff', transition: 'box-shadow .15s' }}
+                        <div key={item.id} style={{ borderRadius: 12, border: `1px solid ${isScheduled ? 'var(--c-border-soft)' : 'rgba(255,92,31,.15)'}`, borderLeft: `3px solid ${cat.color}`, padding: '14px 14px 12px', background: isScheduled ? '#fff' : 'rgba(255,92,31,.02)', transition: 'box-shadow .15s' }}
                           onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.07)'}
                           onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
-                          {/* Badges row */}
+                          {/* Badges */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#1E293B', borderRadius: 6, padding: '3px 8px' }}>{item.type}</span>
-                            {dayLabel && <span style={{ fontSize: 11.5, color: 'var(--c-subtle)' }}>{dayLabel}</span>}
+                            {item.day && (
+                              <span style={{ fontSize: 11.5, color: 'var(--c-faint)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                                Posts {formatDay(item.day, monthKey)}
+                              </span>
+                            )}
                             <span style={{ fontSize: 11, fontWeight: 700, color: st.c, background: st.bg, borderRadius: 6, padding: '3px 8px' }}>{st.label}</span>
                             <div style={{ flex: 1 }} />
                             {assignee && (
-                              <div title={assignee.name} style={{ width: 26, height: 26, borderRadius: '50%', background: assignee.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{assignee.initials}</div>
+                              <div title={`${assignee.name} · ${assignee.title}`} style={{ width: 26, height: 26, borderRadius: '50%', background: assignee.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{assignee.initials}</div>
                             )}
                             <button onClick={() => openEdit(item)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, color: 'var(--c-ghost)' }}
                               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--c-fill)'; (e.currentTarget as HTMLElement).style.color = 'var(--c-subtle)' }}
                               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--c-ghost)' }}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
                             </button>
                             <button onClick={() => deleteItem(item.id)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, color: 'var(--c-ghost)' }}
                               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--c-red-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--c-red)' }}
@@ -296,32 +374,33 @@ export default function ContentPlanner() {
                               <X size={12} />
                             </button>
                           </div>
-                          {/* Title */}
                           <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: item.brief ? 6 : 0 }}>{item.title}</div>
-                          {/* Brief */}
                           {item.brief && (
-                            <div style={{ fontSize: 13, color: 'var(--c-subtle)', lineHeight: 1.55, marginBottom: item.refs?.length ? 8 : 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>{item.brief}</div>
+                            <div style={{ fontSize: 13, color: 'var(--c-subtle)', lineHeight: 1.55, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>{item.brief}</div>
                           )}
-                          {/* Refs */}
                           {item.refs && item.refs.length > 0 && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
                               {item.refs.map((r, i) => (
-                                <span key={i} style={{ fontSize: 12, color: 'var(--c-subtle)', background: 'var(--c-fill)', borderRadius: 7, padding: '3px 9px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                                  {r.label}
-                                </span>
+                                <span key={i} style={{ fontSize: 12, color: 'var(--c-subtle)', background: 'var(--c-fill)', borderRadius: 7, padding: '3px 9px' }}>{r.label}</span>
                               ))}
                             </div>
                           )}
-                          {/* Bottom: effort dots + assign */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: 3 }}>
                               {[1,2,3,4,5].map(n => (
-                                <div key={n} style={{ width: 11, height: 11, borderRadius: 3, background: n <= item.effort ? effortColor : '#E5E7EB', transition: 'background .2s' }} />
+                                <div key={n} style={{ width: 11, height: 11, borderRadius: 3, background: n <= item.effort ? effortColor : '#E5E7EB' }} />
                               ))}
                             </div>
-                            {!assignee && (
-                              <button onClick={() => setPushItem(item)} style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-accent)', background: 'rgba(255,92,31,.08)', borderRadius: 7, padding: '4px 10px' }}>Assign →</button>
+                            {!isScheduled && (
+                              <button onClick={() => openScheduler('client')}
+                                style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: 'var(--c-accent)', borderRadius: 7, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Sparkle size={10} color="#fff" />Smart assign
+                              </button>
+                            )}
+                            {isScheduled && assignee && (
+                              <span style={{ fontSize: 12, color: 'var(--c-green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Check size={11} color="#10B981" />{assignee.name.split(' ')[0]} · starts day {calcWorkStart(item.day!, item.effort)}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -333,13 +412,11 @@ export default function ContentPlanner() {
             })}
           </div>
         ) : (
-          <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--c-faint)' }}>
-            Select a client to view and plan deliverables
-          </div>
+          <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--c-faint)' }}>Select a client to view and plan deliverables</div>
         )}
       </div>
 
-      {/* Add / Edit Modal */}
+      {/* ── Add / Edit Modal ─────────────────────────────────────────────────── */}
       {modal.open && modal.item && (
         <div onClick={closeModal} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 540, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
@@ -350,8 +427,7 @@ export default function ContentPlanner() {
               </div>
               <button onClick={closeModal} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, color: 'var(--c-ghost)' }}><X size={15} /></button>
             </div>
-
-            <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '70vh', overflowY: 'auto' }}>
               {/* AI bar */}
               <div style={{ display: 'flex', gap: 8, padding: '10px 12px', background: 'rgba(255,92,31,.05)', borderRadius: 10, border: '1px solid rgba(255,92,31,.15)' }}>
                 <Sparkle size={14} color="#FF5C1F" style={{ marginTop: 1, flexShrink: 0 }} />
@@ -362,13 +438,11 @@ export default function ContentPlanner() {
                       {aiLoading ? <Spinner size={11} color="#FF5C1F" /> : <Sparkle size={11} color="#FF5C1F" />}Quick idea
                     </button>
                     <button onClick={aiDeepSuggest} disabled={aiLoading} style={{ fontSize: 12, fontWeight: 600, color: '#FF5C1F', background: '#fff', border: '1px solid rgba(255,92,31,.25)', borderRadius: 7, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Sparkle size={11} color="#FF5C1F" />Deep suggest (AI)
+                      <Sparkle size={11} color="#FF5C1F" />Deep suggest
                     </button>
                   </div>
                 </div>
               </div>
-
-              {/* Type */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Type</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
@@ -380,16 +454,12 @@ export default function ContentPlanner() {
                   ))}
                 </div>
               </div>
-
-              {/* Title */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Title</label>
                 <input value={modal.item!.title || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, title: e.target.value } }))} placeholder="e.g. Glow ritual — 3-step routine"
                   style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }}
                   onFocus={e => e.target.style.borderColor = 'var(--c-ink)'} onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
               </div>
-
-              {/* Brief */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Brief</label>
                 <textarea value={modal.item!.brief || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, brief: e.target.value } }))}
@@ -397,8 +467,6 @@ export default function ContentPlanner() {
                   style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, resize: 'vertical' }}
                   onFocus={e => e.target.style.borderColor = 'var(--c-ink)'} onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
               </div>
-
-              {/* Effort + Day */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Effort</label>
@@ -413,13 +481,16 @@ export default function ContentPlanner() {
                   <div style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 4, textAlign: 'center' }}>{EFFORT_LABELS[modal.item!.effort || 3]}</div>
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Scheduled Day (optional)</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Post day (optional)</label>
                   <input type="number" min={1} max={31} value={modal.item!.day || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, day: e.target.value ? Number(e.target.value) : null } }))}
                     placeholder="e.g. 14" style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }} />
+                  {modal.item!.day && modal.item!.effort && (
+                    <div style={{ fontSize: 11, color: 'var(--c-accent)', marginTop: 4 }}>
+                      Work starts day {calcWorkStart(modal.item!.day!, modal.item!.effort! as number)}
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Status */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Status</label>
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -431,26 +502,7 @@ export default function ContentPlanner() {
                   ))}
                 </div>
               </div>
-
-              {/* Assignee */}
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Assign to</label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button onClick={() => setModal(m => ({ ...m, item: { ...m.item!, assignee_id: '' } }))}
-                    style={{ padding: '5px 10px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, border: '1.5px solid', borderColor: !modal.item!.assignee_id ? 'var(--c-accent)' : 'var(--c-border)', color: !modal.item!.assignee_id ? 'var(--c-accent)' : 'var(--c-muted)', background: !modal.item!.assignee_id ? 'rgba(255,92,31,.06)' : '#fff' }}>
-                    Unassigned
-                  </button>
-                  {state.users.map(u => (
-                    <button key={u.id} onClick={() => setModal(m => ({ ...m, item: { ...m.item!, assignee_id: u.id } }))}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, border: '1.5px solid', borderColor: modal.item!.assignee_id === u.id ? 'var(--c-accent)' : 'var(--c-border)', color: modal.item!.assignee_id === u.id ? 'var(--c-accent)' : 'var(--c-muted)', background: modal.item!.assignee_id === u.id ? 'rgba(255,92,31,.06)' : '#fff' }}>
-                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700 }}>{u.initials}</div>
-                      {u.name.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
-
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--c-border-soft)', display: 'flex', gap: 10 }}>
               <button onClick={closeModal} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid var(--c-border)', fontSize: 14, fontWeight: 600, color: 'var(--c-subtle)' }}>Cancel</button>
               <button onClick={saveItem} style={{ flex: 2, padding: '10px', borderRadius: 10, background: 'var(--c-ink)', color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
@@ -461,34 +513,147 @@ export default function ContentPlanner() {
         </div>
       )}
 
-      {/* Push & Assign Modal */}
-      {pushItem && (
-        <div onClick={() => setPushItem(null)} className="modal-overlay">
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
-            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>Push & Assign</div>
-              <button onClick={() => setPushItem(null)}><X size={15} color="var(--c-ghost)" /></button>
-            </div>
-            <div style={{ padding: '14px 20px' }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>{pushItem.title}</div>
-              <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginBottom: 16 }}>{pushItem.type} · {SERVICE_CATS.find(c => c.key === pushItem.cat)?.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', marginBottom: 8 }}>Assign to team member</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {state.users.map(u => (
-                  <button key={u.id} onClick={() => assignItem(u.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border)', background: '#fff', transition: 'all .15s', textAlign: 'left' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--c-accent)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,92,31,.04)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--c-border)'; (e.currentTarget as HTMLElement).style.background = '#fff' }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{u.initials}</div>
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{u.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--c-faint)' }}>{u.title}</div>
-                    </div>
-                    <div style={{ flex: 1 }} />
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-ghost)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                  </button>
-                ))}
+      {/* ── Smart Schedule Modal ─────────────────────────────────────────────── */}
+      {schedOpen && (
+        <div onClick={() => !schedSaving && setSchedOpen(false)} className="modal-overlay">
+          <div onClick={e => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 740, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .25s cubic-bezier(.2,.9,.3,1) both', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--c-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Sparkle size={18} color="#FF5C1F" />
               </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 3 }}>Smart Schedule</div>
+                <div style={{ fontSize: 13, color: 'var(--c-faint)' }}>
+                  {schedRows.length} deliverable{schedRows.length !== 1 ? 's' : ''} · {schedScope === 'client' ? activeClient?.name : 'All clients'} · {monthLabel}
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--c-faint)', background: 'var(--c-fill)', borderRadius: 8, padding: '5px 10px', textAlign: 'right', lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 700, color: 'var(--c-ink)', fontSize: 13 }}>How it works</div>
+                <div>Week N posts → Week N−1 work</div>
+                <div>Effort × days · approval buffer</div>
+              </div>
+              {!schedSaving && <button onClick={() => setSchedOpen(false)} style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--c-fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><X size={14} color="var(--c-muted)" /></button>}
+            </div>
+
+            {/* Legend */}
+            <div style={{ padding: '10px 24px', background: 'var(--c-fill-soft)', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', gap: 16 }}>
+              {[
+                { dot: '#10B981', label: 'Ideal match — in specialty' },
+                { dot: '#F59E0B', label: 'Good match — partial' },
+                { dot: '#EF4444', label: 'Out of specialty — consider reassigning' },
+              ].map(l => (
+                <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--c-subtle)' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: l.dot }} />{l.label}
+                </div>
+              ))}
+            </div>
+
+            {/* Rows */}
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {schedRows.map((row, idx) => {
+                const sb = scoreBar(row.skillScore)
+                const client = state.clients.find(c => c.id === row.item.client_id)
+                return (
+                  <div key={row.item.id}
+                    style={{ padding: '14px 24px', borderBottom: idx < schedRows.length - 1 ? '1px solid var(--c-border-soft)' : 'none', animation: `fadeUp .3s ease ${idx * 0.03}s both` }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 200px', gap: 16, alignItems: 'center' }}>
+
+                      {/* Item info */}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                          {client && (
+                            <div style={{ width: 20, height: 20, borderRadius: 6, background: client.color, color: '#fff', fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{client.initials}</div>
+                          )}
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-ghost)', background: 'var(--c-fill)', borderRadius: 5, padding: '2px 7px' }}>{row.item.type}</span>
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: sb.color }} title={row.skillReason} />
+                          <span style={{ fontSize: 11, fontWeight: 600, color: sb.color, background: sb.bg, borderRadius: 5, padding: '2px 7px' }}>{sb.label}</span>
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, marginBottom: 3 }}>{row.item.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {[1,2,3,4,5].map(n => (
+                            <div key={n} style={{ width: 8, height: 8, borderRadius: 2, background: n <= row.item.effort ? (row.item.effort >= 4 ? '#FF5C1F' : '#F4B740') : '#E5E7EB' }} />
+                          ))}
+                          <span style={{ fontSize: 11.5, color: 'var(--c-faint)', marginLeft: 3 }}>{EFFORT_LABELS[row.item.effort]}</span>
+                        </div>
+                      </div>
+
+                      {/* Timeline */}
+                      <div style={{ background: 'var(--c-fill)', borderRadius: 10, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--c-ghost)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Timeline · {row.weekLabel}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                          <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--c-ink)', fontFamily: 'var(--font-display)' }}>{row.workStartDay}</div>
+                            <div style={{ fontSize: 10, color: 'var(--c-faint)' }}>Start</div>
+                          </div>
+                          <svg width="28" height="12" viewBox="0 0 28 12"><path d="M2 6h20M18 2l6 4-6 4" stroke="var(--c-rule)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
+                          <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: '#F59E0B', fontFamily: 'var(--font-display)' }}>{row.deadlineDay}</div>
+                            <div style={{ fontSize: 10, color: 'var(--c-faint)' }}>Done by</div>
+                          </div>
+                          <svg width="28" height="12" viewBox="0 0 28 12"><path d="M2 6h20M18 2l6 4-6 4" stroke="var(--c-rule)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
+                          <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: '#10B981', fontFamily: 'var(--font-display)' }}>{row.postingDay}</div>
+                            <div style={{ fontSize: 10, color: 'var(--c-faint)' }}>Post</div>
+                          </div>
+                        </div>
+                        {/* Allow overriding post day */}
+                        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 10.5, color: 'var(--c-faint)' }}>Post day:</span>
+                          <input type="number" min={1} max={31} value={row.postingDay}
+                            onChange={e => overridePostDay(idx, Number(e.target.value))}
+                            style={{ width: 48, border: '1px solid var(--c-border)', borderRadius: 6, padding: '2px 6px', fontSize: 12, textAlign: 'center' }} />
+                        </div>
+                      </div>
+
+                      {/* Assignee picker */}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--c-ghost)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Assigned to</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {state.users.map(u => {
+                            const { score } = skillScore(row.item.type, u.title || '')
+                            const isSelected = u.id === row.assignee.id
+                            const matchColor = score >= 0.9 ? '#10B981' : score >= 0.65 ? '#F59E0B' : '#EF4444'
+                            return (
+                              <button key={u.id} onClick={() => overrideAssignee(idx, u)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 8px', borderRadius: 8, border: `1.5px solid ${isSelected ? 'var(--c-accent)' : 'var(--c-border)'}`, background: isSelected ? 'rgba(255,92,31,.05)' : '#fff', transition: 'all .12s', cursor: 'pointer' }}>
+                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, flexShrink: 0 }}>{u.initials}</div>
+                                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                                  <div style={{ fontSize: 12.5, fontWeight: isSelected ? 700 : 500, color: isSelected ? 'var(--c-accent)' : 'var(--c-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name.split(' ')[0]}</div>
+                                  <div style={{ fontSize: 10.5, color: 'var(--c-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.title || u.role}</div>
+                                </div>
+                                <div style={{ width: 7, height: 7, borderRadius: '50%', background: matchColor, flexShrink: 0 }} title={`Skill score: ${Math.round(score * 100)}%`} />
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12.5, color: 'var(--c-faint)' }}>
+                  {schedRows.filter(r => r.skillScore >= 0.9).length} ideal · {schedRows.filter(r => r.skillScore >= 0.65 && r.skillScore < 0.9).length} good · {schedRows.filter(r => r.skillScore < 0.65).length} out of specialty
+                </div>
+              </div>
+              <button onClick={() => setSchedOpen(false)} disabled={schedSaving}
+                style={{ padding: '11px 20px', borderRadius: 11, border: '1.5px solid var(--c-border)', fontSize: 14, fontWeight: 600, color: 'var(--c-subtle)', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={confirmSchedule} disabled={schedSaving}
+                style={{ padding: '11px 24px', borderRadius: 11, background: schedSaving ? '#6B7280' : 'var(--c-ink)', color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', transition: 'transform .15s' }}
+                onMouseEnter={e => { if (!schedSaving) (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' }}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ''}>
+                {schedSaving ? <Spinner size={14} color="#fff" /> : <Check size={14} color="#fff" />}
+                {schedSaving ? 'Scheduling…' : `Confirm & push ${schedRows.length} items`}
+              </button>
             </div>
           </div>
         </div>
