@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { ChevronLeft, ChevronRight, Planner } from '@/components/ui/Icon'
 import { STATUS_PIPE, SEED_CLIENTS, SEED_TEAM } from '@/lib/seed-data'
@@ -12,14 +12,6 @@ function parseMonth(key: string) {
 function monthLabel(key: string) {
   const { y, m } = parseMonth(key)
   return ['January','February','March','April','May','June','July','August','September','October','November','December'][m] + ' ' + y
-}
-function daysInMonth(key: string) {
-  const { y, m } = parseMonth(key)
-  return new Date(y, m + 1, 0).getDate()
-}
-function dayOfWeek(key: string, d: number) {
-  const { y, m } = parseMonth(key)
-  return new Date(y, m, d).getDay()
 }
 function weekNum(day: number): number {
   return Math.ceil(day / 7)
@@ -36,9 +28,8 @@ const WEEK_RANGES = [
   { key: 'w3', label: 'W3', start: 15, end: 21 },
   { key: 'w4', label: 'W4', start: 22, end: 28 },
   { key: 'w5', label: 'W5', start: 29, end: 31 },
+  { key: 'month', label: 'This Month' },
 ] as const
-
-const DN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 const CLIENT_COLORS: Record<string, string> = {
   sunso: '#FF5C1F', lumio: '#3B82F6', elysian: '#10B981',
@@ -50,18 +41,14 @@ export default function ContentCalendar() {
   const toast = useToast()
   const [monthKey, setMonthKey] = useState('2026-5')
   const [calClient, setCalClient] = useState('all')
-  const [weekFilter, setWeekFilter] = useState<'today'|'w1'|'w2'|'w3'|'w4'|'w5'>('today')
-  const [calDay, setCalDay] = useState<number|null>(null)
+  const [weekFilter, setWeekFilter] = useState<'today'|'w1'|'w2'|'w3'|'w4'|'w5'|'month'>('today')
   const [draggingId, setDraggingId] = useState<string|null>(null)
   const [dragOverCol, setDragOverCol] = useState<string|null>(null)
   const [detailId, setDetailId] = useState<string|null>(null)
-  const sliderRef = useRef<HTMLDivElement>(null)
-
   const now = new Date()
   const { y: my, m: mm } = parseMonth(monthKey)
   const isCurMonth = now.getFullYear() === my && now.getMonth() === mm
   const todayDate = now.getDate()
-  const dim = daysInMonth(monthKey)
 
   const allItems = state.planItems
   const mItems = allItems.filter(it => it.month === monthKey)
@@ -69,10 +56,10 @@ export default function ContentCalendar() {
 
   // Scope filter
   const inScope = (it: PlanItem): boolean => {
-    if (calDay !== null) return it.day === calDay
     if (weekFilter === 'today') return it.status !== 'published'
+    if (weekFilter === 'month') return true
     const wr = WEEK_RANGES.find(w => w.key === weekFilter)
-    if (!wr || wr.key === 'today') return true
+    if (!wr || !('start' in wr)) return true
     if (it.day == null) return false
     return it.day >= wr.start && it.day <= wr.end
   }
@@ -87,7 +74,6 @@ export default function ContentCalendar() {
     if (m < 0) { m = 11; y-- }
     if (m > 11) { m = 0; y++ }
     setMonthKey(y + '-' + m)
-    setCalDay(null)
   }
 
   function moveStatus(id: string, status: ContentStatus) {
@@ -131,9 +117,6 @@ export default function ContentCalendar() {
     }
     return map[it.type] || { c:'#6B7280', bg:'#F3F4F6' }
   }
-
-  // Day strip tabs
-  const dayTabs = Array.from({ length: dim }, (_, i) => i + 1)
 
   const effortLabel = (n: number) => ['','Light','Easy','Medium','Heavy','Max'][n] || ''
 
@@ -189,7 +172,7 @@ export default function ContentCalendar() {
 
         {/* Overdue badge */}
         {overdueCount > 0 && (
-          <button onClick={() => { setWeekFilter('today'); setCalDay(null) }}
+          <button onClick={() => setWeekFilter('today')}
             style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:12.5, fontWeight:700, color:'#DC2626', background:'#FEE2E2', borderRadius:9, padding:'7px 12px', border:'none', cursor:'pointer' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
             {overdueCount} overdue
@@ -205,42 +188,12 @@ export default function ContentCalendar() {
         {/* Week tabs */}
         <div style={{ display:'flex', gap:3, background:'var(--c-fill)', borderRadius:10, padding:3 }}>
           {WEEK_RANGES.map(w => {
-            const sel = calDay === null && weekFilter === w.key
+            const sel = weekFilter === w.key
             return (
               <button key={w.key}
-                onClick={() => { setWeekFilter(w.key); setCalDay(null) }}
+                onClick={() => setWeekFilter(w.key)}
                 style={{ padding:'5px 12px', borderRadius:7, fontSize:12.5, fontWeight:700, background: sel ? '#fff' : 'transparent', color: sel ? 'var(--c-ink)' : 'var(--c-muted)', boxShadow: sel ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition:'all .12s', whiteSpace:'nowrap' }}>
                 {w.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Day strip */}
-      <div ref={sliderRef} style={{ overflowX:'auto', marginBottom:16, paddingBottom:4, scrollbarWidth:'thin', scrollbarColor:'var(--c-rule) transparent' }}>
-        <div style={{ display:'flex', gap:4, minWidth:'max-content', padding:'2px 0' }}>
-          {dayTabs.map(d => {
-            const dow = dayOfWeek(monthKey, d)
-            const isWknd = [0, 6].includes(dow)
-            const isToday = isCurMonth && d === todayDate
-            const sel = calDay === d
-            const hasWork = clientItems.some(it => it.day === d)
-            return (
-              <button key={d}
-                onClick={() => { setCalDay(sel ? null : d); if (!sel) setWeekFilter('today') }}
-                style={{
-                  display:'flex', flexDirection:'column', alignItems:'center', gap:2,
-                  padding:'7px 9px', borderRadius:9, minWidth:36,
-                  border:`1.5px solid ${sel ? 'var(--c-ink)' : isToday ? '#FF5C1F' : 'transparent'}`,
-                  background: sel ? 'var(--c-ink)' : isToday ? '#FFF1E9' : hasWork && !isWknd ? 'var(--c-fill)' : 'transparent',
-                  color: sel ? '#fff' : isToday ? '#FF5C1F' : isWknd ? 'var(--c-rule)' : 'var(--c-ink-3)',
-                  opacity: isWknd && !sel && !hasWork ? .4 : 1,
-                  transition:'all .12s', cursor:'pointer',
-                }}>
-                <span style={{ fontSize:9.5, fontWeight:700, letterSpacing:'.02em' }}>{DN[dow]}</span>
-                <span style={{ fontFamily:'var(--font-display)', fontSize:13.5, fontWeight:700, lineHeight:1 }}>{d}</span>
-                {hasWork && !sel && <span style={{ width:4, height:4, borderRadius:'50%', background: isToday ? '#FF5C1F' : 'var(--c-ghost)', marginTop:1 }} />}
               </button>
             )
           })}
