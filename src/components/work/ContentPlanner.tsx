@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { Plus, X, Sparkle, Spinner, Check } from '@/components/ui/Icon'
 import { SERVICE_CATS, TYPE_MAP, EFFORT_LABELS, IDEA_BANK, BRIEF_BANK, STATUS_PIPE } from '@/lib/seed-data'
@@ -44,7 +44,19 @@ export default function ContentPlanner() {
   const { state, dispatch } = useApp()
   const toast = useToast()
   const [monthOff, setMonthOff] = useState(0)
+  const [monthAutoSet, setMonthAutoSet] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+
+  // Once plan items load, jump to the month that has data if current has none
+  React.useEffect(() => {
+    if (monthAutoSet || state.planItems.length === 0) return
+    const cur = getMonthKey(0)
+    const prev = getMonthKey(-1)
+    if (!state.planItems.some(i => i.month === cur) && state.planItems.some(i => i.month === prev)) {
+      setMonthOff(-1)
+    }
+    setMonthAutoSet(true)
+  }, [state.planItems, monthAutoSet])
   const [modal, setModal] = useState<ModalState>({ open: false, item: null, clientId: '', cat: 'social' })
   const [pushItem, setPushItem] = useState<PlanItem | null>(null)
   const [aiLoading, setAiLoading] = useState(false)

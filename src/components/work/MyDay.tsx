@@ -19,7 +19,7 @@ export default function MyDay() {
   const [done, setDone] = useState<Record<string,boolean>>({})
   const [expanded, setExpanded] = useState<string|null>('t1')
   const [createOpen, setCreateOpen] = useState(false)
-  const [nw, setNw] = useState<{ title:string; clientId:string; type:string; due:string; priority:'Low'|'Medium'|'High' }>({ title:'', clientId:'sunso', type:'Design', due:'Today', priority:'Medium' })
+  const [nw, setNw] = useState<{ title:string; clientId:string; type:string; due:string; priority:'Low'|'Medium'|'High' }>({ title:'', clientId:'', type:'Design', due:'Today', priority:'Medium' })
 
   const now = new Date()
   const h = now.getHours()
@@ -32,8 +32,21 @@ export default function MyDay() {
   const clientName = (id: string) => state.clients.find(c => c.id === id)?.name || id
 
   function createTask() {
+    if (!nw.title.trim()) return
+    dispatch({ type: 'UPSERT_TASK', task: {
+      id: `task-${Date.now()}`,
+      title: nw.title,
+      client_id: nw.clientId,
+      type: nw.type,
+      assignee_id: state.currentUser?.id || '',
+      due: nw.due,
+      priority: nw.priority,
+      done: false,
+      created_at: new Date().toISOString(),
+    }})
     toast('Task created & assigned')
     setCreateOpen(false)
+    setNw({ title:'', clientId: state.clients[0]?.id || '', type:'Design', due:'Today', priority:'Medium' })
   }
 
   if (role === 'owner') return <OwnerView name={name} greeting={greeting} dateStr={dateStr} dispatch={dispatch} clients={state.clients} />

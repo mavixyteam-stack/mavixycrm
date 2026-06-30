@@ -130,6 +130,15 @@ export async function dbUpsertClient(client: Client) {
     industry: client.industry,
     contact_name: client.contact_name,
     contact_email: client.contact_email,
+    whatsapp: client.whatsapp,
+    account_owner_id: client.account_owner_id,
+    posts_per_month: client.posts_per_month,
+    monthly_retainer: client.monthly_retainer,
+    ai_brief: client.ai_brief,
+    about_business: client.about_business,
+    target_audience: client.target_audience,
+    brand_voice: client.brand_voice,
+    reference_links: client.reference_links,
   })
   if (error) console.error('upsertClient', error)
 }

@@ -22,18 +22,21 @@ const SEED_DEALS = [
 export default function PipelineScreen() {
   const { state, dispatch } = useApp()
   const toast = useToast()
-  const [deals, setDeals] = useState(SEED_DEALS)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [form, setForm] = useState({ name: '', company: '', value: '', stage: 'lead' as typeof STAGES[number]['key'], probability: 30 })
+
+  const deals = state.deals.length > 0 ? state.deals : SEED_DEALS
 
   const totalPipeline = deals.filter(d => d.stage !== 'closed').reduce((s, d) => s + d.value, 0)
   const weighted = deals.filter(d => d.stage !== 'closed').reduce((s, d) => s + d.value * (d.probability / 100), 0)
   const closed = deals.filter(d => d.stage === 'closed').reduce((s, d) => s + d.value, 0)
 
   function moveStage(id: string, stage: typeof STAGES[number]['key']) {
-    setDeals(ds => ds.map(d => d.id === id ? { ...d, stage } : d))
+    const deal = deals.find(d => d.id === id)
+    if (!deal) return
+    dispatch({ type: 'UPSERT_DEAL', deal: { ...deal, stage } })
     toast(`Moved to ${STAGES.find(s => s.key === stage)?.label}`)
   }
 
@@ -46,10 +49,10 @@ export default function PipelineScreen() {
       value: Number(form.value) || 0,
       stage: form.stage,
       probability: form.probability,
-      owner_id: state.currentUser?.id || 'dev',
+      owner_id: state.currentUser?.id || '',
       created_at: new Date().toISOString(),
     }
-    setDeals(ds => [...ds, deal])
+    dispatch({ type: 'UPSERT_DEAL', deal })
     toast('Deal added')
     setAddOpen(false)
     setForm({ name: '', company: '', value: '', stage: 'lead', probability: 30 })

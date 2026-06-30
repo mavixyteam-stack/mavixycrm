@@ -1,15 +1,18 @@
 'use client'
 import { useState } from 'react'
-import { useApp, useToast } from '@/lib/store'
+import { useApp, useToast, useUpsertClient } from '@/lib/store'
 import { Sparkle, Spinner, X } from '@/components/ui/Icon'
 import { SERVICE_CATS, STATUS_PIPE } from '@/lib/seed-data'
 
 export default function ClientDetail() {
   const { state, dispatch } = useApp()
   const toast = useToast()
+  const upsertClient = useUpsertClient()
   const [tab, setTab] = useState<'overview'|'content'|'brain'>('overview')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiInsight, setAiInsight] = useState('')
+  const [brainEdits, setBrainEdits] = useState<Record<string,string>>({})
+  const [brainSaving, setBrainSaving] = useState(false)
 
   const client = state.clients.find(c => c.id === state.selectedClientId) || state.clients[0]
   if (!client) return null
@@ -238,27 +241,97 @@ export default function ClientDetail() {
             )}
           </div>
 
-          {/* Brand notes */}
-          <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 16, padding: '20px 22px' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 10 }}>Brand Notes</div>
-            <textarea placeholder={`Paste brand guidelines, tone of voice, do's & don'ts for ${client.name}...`}
-              rows={6}
-              style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '12px 14px', fontSize: 13.5, resize: 'vertical', color: 'var(--c-ink)', lineHeight: 1.6 }}
-              onFocus={e => e.target.style.borderColor = 'var(--c-ink)'}
-              onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
-          </div>
-
-          {/* Reference gallery placeholder */}
-          <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 16, padding: '20px 22px' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Reference Gallery</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} style={{ aspectRatio: '1', background: 'var(--c-fill)', borderRadius: 10, border: '1.5px dashed var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-ghost)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          {/* Scope info */}
+          {(client.posts_per_month || client.monthly_retainer || client.ai_brief) && (
+            <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, padding: '20px 22px' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Scope & Plan</div>
+              <div style={{ display: 'grid', gridTemplateColumns: client.posts_per_month && client.monthly_retainer ? '1fr 1fr' : '1fr', gap: 14, marginBottom: client.ai_brief ? 14 : 0 }}>
+                {client.posts_per_month && (
+                  <div style={{ background: 'var(--c-fill)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-display)' }}>{client.posts_per_month}</div>
+                    <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 2 }}>posts / month</div>
+                  </div>
+                )}
+                {client.monthly_retainer && (
+                  <div style={{ background: 'var(--c-fill)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-display)' }}>₹{client.monthly_retainer.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 2 }}>monthly retainer</div>
+                  </div>
+                )}
+              </div>
+              {client.ai_brief && (
+                <div>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>AI Workload Brief</div>
+                  <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--c-ink-2)' }}>{client.ai_brief}</p>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Brand Knowledge — editable */}
+          {(() => {
+            const fields = [
+              { key: 'about_business', label: 'About the business', placeholder: "What they sell, where, what makes them different...", rows: 3 },
+              { key: 'target_audience', label: 'Target audience', placeholder: "e.g. Women 22-34, tier-1, skincare-curious", rows: 1 },
+              { key: 'brand_voice', label: 'Brand voice & tone', placeholder: "e.g. Warm, editorial, confident", rows: 1 },
+              { key: 'reference_links', label: 'Reference / inspiration links', placeholder: "competitor profiles, moodboards, brand guidelines...", rows: 2 },
+            ]
+            const hasAnyData = fields.some(f => (client as any)[f.key])
+            const isDirty = Object.keys(brainEdits).length > 0
+            return (
+              <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 16, padding: '20px 22px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>Client Brain</div>
+                  {isDirty && (
+                    <button onClick={async () => {
+                      setBrainSaving(true)
+                      await upsertClient({ ...client, ...brainEdits } as any)
+                      setBrainEdits({})
+                      setBrainSaving(false)
+                      toast('Brain updated')
+                    }} disabled={brainSaving}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#fff', background: 'var(--c-accent)', borderRadius: 9, padding: '7px 14px', opacity: brainSaving ? .7 : 1 }}>
+                      {brainSaving ? <Spinner size={12} color="#fff" /> : null}
+                      {brainSaving ? 'Saving…' : 'Save changes'}
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {fields.map(f => (
+                    <div key={f.key}>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 6 }}>{f.label}</label>
+                      {f.rows === 1 ? (
+                        <input
+                          value={brainEdits[f.key] !== undefined ? brainEdits[f.key] : ((client as any)[f.key] || '')}
+                          onChange={e => setBrainEdits(b => ({ ...b, [f.key]: e.target.value }))}
+                          placeholder={f.placeholder}
+                          style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, background: 'var(--c-fill)', transition: 'border-color .15s, background .15s' }}
+                          onFocus={e => { e.target.style.borderColor = 'var(--c-ink)'; e.target.style.background = '#fff' }}
+                          onBlur={e => { e.target.style.borderColor = 'var(--c-border)'; e.target.style.background = 'var(--c-fill)' }}
+                        />
+                      ) : (
+                        <textarea
+                          rows={f.rows}
+                          value={brainEdits[f.key] !== undefined ? brainEdits[f.key] : ((client as any)[f.key] || '')}
+                          onChange={e => setBrainEdits(b => ({ ...b, [f.key]: e.target.value }))}
+                          placeholder={f.placeholder}
+                          style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, resize: 'vertical', lineHeight: 1.6, background: 'var(--c-fill)', transition: 'border-color .15s, background .15s' }}
+                          onFocus={e => { e.target.style.borderColor = 'var(--c-ink)'; e.target.style.background = '#fff' }}
+                          onBlur={e => { e.target.style.borderColor = 'var(--c-border)'; e.target.style.background = 'var(--c-fill)' }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {!hasAnyData && !isDirty && (
+                  <div style={{ marginTop: 16, background: '#0F172A', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Sparkle size={13} color="#FF5C1F" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,.75)' }}>Fill in the client brain — AI uses this to generate briefs & ideas for this account.</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
     </div>

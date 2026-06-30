@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useApp, useToast, useUpsertPlanItem } from '@/lib/store'
 import { ChevronLeft, ChevronRight, Planner } from '@/components/ui/Icon'
 import { STATUS_PIPE } from '@/lib/seed-data'
@@ -36,11 +36,29 @@ const CLIENT_COLORS: Record<string, string> = {
   verve: '#EF4444', weekend: '#8B5CF6',
 }
 
+function getMonthKey() {
+  const d = new Date()
+  return `${d.getFullYear()}-${d.getMonth() + 1}`
+}
+
 export default function ContentCalendar() {
   const { state, dispatch } = useApp()
   const toast = useToast()
   const upsertPlanItem = useUpsertPlanItem()
-  const [monthKey, setMonthKey] = useState('2026-5')
+  const [monthKey, setMonthKey] = useState(getMonthKey)
+  const [monthAutoSet, setMonthAutoSet] = useState(false)
+
+  // Once plan items load, jump to a month that has data if current has none
+  React.useEffect(() => {
+    if (monthAutoSet || state.planItems.length === 0) return
+    const cur = getMonthKey()
+    const d = new Date(); d.setMonth(d.getMonth() - 1)
+    const prev = `${d.getFullYear()}-${d.getMonth() + 1}`
+    if (!state.planItems.some(i => i.month === cur) && state.planItems.some(i => i.month === prev)) {
+      setMonthKey(prev)
+    }
+    setMonthAutoSet(true)
+  }, [state.planItems, monthAutoSet])
   const [calClient, setCalClient] = useState('all')
   const [weekFilter, setWeekFilter] = useState<'today'|'w1'|'w2'|'w3'|'w4'|'w5'|'month'>('today')
   const [draggingId, setDraggingId] = useState<string|null>(null)

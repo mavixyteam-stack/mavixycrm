@@ -31,6 +31,15 @@ create table public.clients (
   industry text default '',
   contact_name text default '',
   contact_email text default '',
+  whatsapp text default '',
+  account_owner_id uuid references public.profiles on delete set null,
+  posts_per_month integer,
+  monthly_retainer integer,
+  ai_brief text default '',
+  about_business text default '',
+  target_audience text default '',
+  brand_voice text default '',
+  reference_links text default '',
   created_at timestamptz default now()
 );
 

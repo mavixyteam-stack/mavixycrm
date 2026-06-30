@@ -31,6 +31,15 @@ export interface Client {
   industry?: string
   contact_name?: string
   contact_email?: string
+  whatsapp?: string
+  account_owner_id?: string
+  posts_per_month?: number
+  monthly_retainer?: number
+  ai_brief?: string
+  about_business?: string
+  target_audience?: string
+  brand_voice?: string
+  reference_links?: string
   created_at: string
 }
 
