@@ -4,6 +4,222 @@ import { useApp, useToast } from '@/lib/store'
 import { Sparkle, Spinner, Check, X } from '@/components/ui/Icon'
 import type { Client, PlanItem } from '@/types'
 
+// ─── Client-Friendly Report View ─────────────────────────────────────────────
+function ClientFriendlyView({ client, report, onClose }: { client: Client; report: StructuredReport; onClose: () => void }) {
+  const month = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+
+  function handlePrint() {
+    const content = document.getElementById('client-report-content')
+    if (!content) return
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) return
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${client.name} – ${month} Report</title>
+        <meta charset="utf-8" />
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0F172A; background: #fff; }
+          .page { max-width: 680px; margin: 0 auto; padding: 48px 40px; }
+          .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 2px solid #F1F5F9; }
+          .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; color: #0F172A; }
+          .logo span { color: #FF5C1F; }
+          .header-right { text-align: right; font-size: 12px; color: #94A3B8; line-height: 1.6; }
+          .client-hero { margin-bottom: 36px; }
+          .client-name { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 4px; }
+          .client-period { font-size: 14px; color: #64748B; }
+          .headline { font-size: 15px; color: #374151; line-height: 1.65; padding: 16px 20px; background: #F8FAFC; border-radius: 10px; border-left: 3px solid #FF5C1F; margin-bottom: 36px; }
+          .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 40px; }
+          .metric { background: #F8FAFC; border-radius: 10px; padding: 16px; }
+          .metric-val { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: #0F172A; }
+          .metric-label { font-size: 11px; color: #94A3B8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+          .metric-change { font-size: 12px; font-weight: 700; margin-top: 4px; }
+          .metric-change.pos { color: #10B981; }
+          .metric-change.neg { color: #EF4444; }
+          .section { margin-bottom: 32px; }
+          .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #F1F5F9; }
+          .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+          .section-title { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #0F172A; }
+          .item { display: flex; gap: 10px; padding: 7px 0; }
+          .dash { color: #CBD5E1; font-size: 14px; line-height: 1.6; flex-shrink: 0; }
+          .item-text { font-size: 13.5px; color: #374151; line-height: 1.65; }
+          .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #F1F5F9; display: flex; justify-content: space-between; font-size: 11.5px; color: #94A3B8; }
+          @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="header">
+            <div class="logo">mavixy<span>.</span></div>
+            <div class="header-right">
+              <div>Monthly Performance Report</div>
+              <div>${report.services}</div>
+              <div>${report.dateRange}</div>
+            </div>
+          </div>
+          <div class="client-hero">
+            <div class="client-name">${client.name}</div>
+            <div class="client-period">${month}</div>
+          </div>
+          <div class="headline">
+            Here's a summary of your marketing performance for ${report.dateRange}.
+            Your team delivered strong results across ${report.services} — key highlights and next steps are below.
+          </div>
+          <div class="metrics">
+            ${report.metrics.map(m => `
+              <div class="metric">
+                <div class="metric-label">${m.label}</div>
+                <div class="metric-val">${m.value}</div>
+                <div class="metric-change ${m.positive ? 'pos' : 'neg'}">${m.change}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="section">
+            <div class="section-header"><div class="dot" style="background:#10B981"></div><div class="section-title">Highlights</div></div>
+            ${report.wins.map(w => `<div class="item"><span class="dash">—</span><span class="item-text">${w}</span></div>`).join('')}
+          </div>
+          <div class="section">
+            <div class="section-header"><div class="dot" style="background:#F59E0B"></div><div class="section-title">Areas of Focus</div></div>
+            ${report.watchOuts.map(w => `<div class="item"><span class="dash">—</span><span class="item-text">${w}</span></div>`).join('')}
+          </div>
+          <div class="section">
+            <div class="section-header"><div class="dot" style="background:#3B82F6"></div><div class="section-title">What's Coming Next</div></div>
+            ${report.nextActions.map(a => `<div class="item"><span class="dash">—</span><span class="item-text">${a}</span></div>`).join('')}
+          </div>
+          <div class="footer">
+            <div>Prepared by Mavixy · ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })}</div>
+            <div>Confidential — for ${client.name} only</div>
+          </div>
+        </div>
+        <script>window.onload = () => { window.print(); }</script>
+      </body>
+      </html>
+    `)
+    win.document.close()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 20px' }}>
+      {/* Close backdrop */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0 }} onClick={onClose} />
+
+      <div id="client-report-content" style={{ width: '100%', maxWidth: 680, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.3)', animation: 'popIn .25s cubic-bezier(.2,.9,.3,1) both', position: 'relative', zIndex: 1 }}>
+
+        {/* Top bar — agency controls */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#0F172A', gap: 12 }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', fontWeight: 500 }}>Client view · {client.name}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handlePrint}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 14px', border: '1px solid rgba(255,255,255,.15)', transition: 'background .15s', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.16)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.1)'}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+              Print / Save PDF
+            </button>
+            <button onClick={onClose}
+              style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.5)', cursor: 'pointer', border: '1px solid rgba(255,255,255,.1)', transition: 'background .15s' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.14)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.08)'}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* Report content */}
+        <div style={{ padding: '40px 48px 48px' }}>
+
+          {/* Agency header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 36, paddingBottom: 24, borderBottom: '2px solid #F1F5F9' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: '#0F172A' }}>
+              mavixy<span style={{ color: '#FF5C1F' }}>.</span>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 12, color: '#94A3B8', lineHeight: 1.7 }}>
+              <div style={{ fontWeight: 600 }}>Monthly Performance Report</div>
+              <div>{report.services}</div>
+              <div>{report.dateRange}</div>
+            </div>
+          </div>
+
+          {/* Client + period */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 34, fontWeight: 800, letterSpacing: '-0.03em', color: '#0F172A', marginBottom: 4 }}>{client.name}</div>
+            <div style={{ fontSize: 14, color: '#64748B' }}>{month}</div>
+          </div>
+
+          {/* Intro blurb */}
+          <div style={{ fontSize: 14.5, color: '#374151', lineHeight: 1.7, padding: '16px 20px', background: '#F8FAFC', borderRadius: 12, borderLeft: '3px solid #FF5C1F', marginBottom: 36 }}>
+            Here's a summary of your marketing performance for {report.dateRange}.
+            {' '}Your team delivered results across {report.services} — key highlights and what's coming next are below.
+          </div>
+
+          {/* Metrics */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 40 }}>
+            {report.metrics.map(m => (
+              <div key={m.label} style={{ background: '#F8FAFC', borderRadius: 12, padding: '16px 14px' }}>
+                <div style={{ fontSize: 10.5, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8, fontWeight: 600 }}>{m.label}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1 }}>{m.value}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: m.positive ? '#10B981' : '#EF4444', marginTop: 6 }}>{m.change}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Highlights */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #F1F5F9' }}>
+              <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: '#0F172A' }}>HIGHLIGHTS</span>
+            </div>
+            {report.wins.map((w, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '7px 0' }}>
+                <span style={{ color: '#CBD5E1', fontSize: 15, lineHeight: 1.55, flexShrink: 0 }}>—</span>
+                <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.65 }}>{w}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Areas of focus */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #F1F5F9' }}>
+              <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: '#0F172A' }}>AREAS OF FOCUS</span>
+            </div>
+            {report.watchOuts.map((w, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '7px 0' }}>
+                <span style={{ color: '#CBD5E1', fontSize: 15, lineHeight: 1.55, flexShrink: 0 }}>—</span>
+                <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.65 }}>{w}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Coming up */}
+          <div style={{ marginBottom: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #F1F5F9' }}>
+              <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#3B82F6', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: '#0F172A' }}>WHAT'S COMING NEXT</span>
+            </div>
+            {report.nextActions.map((a, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '7px 0' }}>
+                <span style={{ color: '#CBD5E1', fontSize: 15, lineHeight: 1.55, flexShrink: 0 }}>—</span>
+                <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.65 }}>{a}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div style={{ marginTop: 48, paddingTop: 20, borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#94A3B8' }}>
+            <div>Prepared by Mavixy · {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+            <div>Confidential — for {client.name} only</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ReportStatus = 'pending' | 'drafting' | 'ready' | 'sent'
 
@@ -135,6 +351,7 @@ export default function ReportsScreen() {
   const [statusMap, setStatusMap] = useState<Record<string, ReportStatus>>({})
   const [reportMap, setReportMap] = useState<Record<string, StructuredReport>>({})
   const [sendOpen, setSendOpen] = useState(false)
+  const [clientViewOpen, setClientViewOpen] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [editText, setEditText] = useState('')
 
@@ -276,10 +493,11 @@ export default function ReportsScreen() {
                     {editMode ? 'Preview' : 'Edit'}
                   </button>
                 )}
-                <button onClick={() => toast('Client-friendly PDF view coming soon')}
-                  style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-subtle)', background: 'var(--c-fill)', borderRadius: 9, padding: '7px 14px', border: '1px solid var(--c-border)', transition: 'background .15s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--c-border)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--c-fill)'}
+                <button
+                  onClick={() => report ? setClientViewOpen(true) : toast('Draft the report first to preview client view')}
+                  style={{ fontSize: 13, fontWeight: 600, color: report ? 'var(--c-ink)' : 'var(--c-ghost)', background: report ? 'var(--c-fill)' : '#F8FAFC', borderRadius: 9, padding: '7px 14px', border: `1px solid ${report ? 'var(--c-border)' : 'var(--c-border-soft)'}`, transition: 'background .15s', cursor: report ? 'pointer' : 'default' }}
+                  onMouseEnter={e => { if (report) (e.currentTarget as HTMLElement).style.background = 'var(--c-border)' }}
+                  onMouseLeave={e => { if (report) (e.currentTarget as HTMLElement).style.background = 'var(--c-fill)' }}
                 >
                   Client-friendly view
                 </button>
@@ -444,6 +662,11 @@ export default function ReportsScreen() {
           </div>
         )}
       </div>
+
+      {/* Client-friendly view */}
+      {clientViewOpen && client && report && (
+        <ClientFriendlyView client={client} report={report} onClose={() => setClientViewOpen(false)} />
+      )}
 
       {/* Send to client modal */}
       {sendOpen && client && (
