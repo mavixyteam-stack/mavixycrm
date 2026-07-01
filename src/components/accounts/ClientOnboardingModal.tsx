@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useApp, useToast, useUpsertClient } from '@/lib/store'
 import { X, Sparkle, Check } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import type { Client } from '@/types'
 
 const ONBOARD_SERVICES = [
@@ -121,7 +122,7 @@ export default function ClientOnboardingModal({ onClose }: Props) {
   }
 
   return (
-    <div onClick={onClose} className="modal-overlay">
+    <ModalPortal><div onClick={onClose} className="modal-overlay">
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 540, background: '#fff', borderRadius: 28, overflow: 'hidden', boxShadow: '0 40px 90px -20px rgba(0,0,0,.5)', animation: 'popIn .26s cubic-bezier(.2,.9,.3,1) both' }}>
         {/* Header */}
         <div style={{ padding: '22px 26px 0' }}>
@@ -337,6 +338,6 @@ export default function ClientOnboardingModal({ onClose }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </div></ModalPortal>
   )
 }

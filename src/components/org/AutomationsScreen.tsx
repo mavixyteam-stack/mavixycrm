@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useToast } from '@/lib/store'
 import { Zap, Plus, X, Check } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const SEED_AUTOMATIONS = [
   { id: 'a1', name: 'Monthly report sender', trigger: 'First Monday of month', action: 'Draft + email report to all clients', active: true, runs: 6 },
@@ -104,7 +105,7 @@ export default function AutomationsScreen() {
       </div>
 
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setAddOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>New Automation</div>
@@ -138,7 +139,7 @@ export default function AutomationsScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )

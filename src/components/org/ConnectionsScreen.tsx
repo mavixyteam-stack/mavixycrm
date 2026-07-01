@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useToast } from '@/lib/store'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 interface Creds {
   meta_app_id: string; meta_app_secret: string; meta_access_token: string; meta_ad_account_id: string
@@ -206,7 +207,7 @@ export default function ConnectionsScreen() {
 
 function CModal({ title, onClose, children }: { title:string; onClose:()=>void; children:React.ReactNode }) {
   return (
-    <div onClick={onClose} className="modal-overlay">
+    <ModalPortal><div onClick={onClose} className="modal-overlay">
       <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:560, background:'#fff', borderRadius:20, overflow:'hidden', boxShadow:'var(--shadow-modal)', animation:'popIn .24s cubic-bezier(.2,.9,.3,1) both' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 24px', borderBottom:'1px solid var(--c-border-soft)' }}>
           <h3 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:700 }}>{title}</h3>
@@ -216,7 +217,7 @@ function CModal({ title, onClose, children }: { title:string; onClose:()=>void; 
         </div>
         <div style={{ padding:'20px 24px', maxHeight:'72vh', overflowY:'auto' }}>{children}</div>
       </div>
-    </div>
+    </div></ModalPortal>
   )
 }
 

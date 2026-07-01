@@ -1,6 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import { useApp, useToast, useUpsertPlanItem, useDeletePlanItem } from '@/lib/store'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import { Plus, X, Sparkle, Spinner, Check } from '@/components/ui/Icon'
 import { SERVICE_CATS, TYPE_MAP, EFFORT_LABELS, IDEA_BANK, BRIEF_BANK, STATUS_PIPE } from '@/lib/seed-data'
 import { schedule, skillScore, weekOf, calcWorkStart } from '@/lib/scheduler'
@@ -419,7 +420,7 @@ export default function ContentPlanner() {
 
       {/* ── Add / Edit Modal ─────────────────────────────────────────────────── */}
       {modal.open && modal.item && (
-        <div onClick={closeModal} className="modal-overlay">
+        <ModalPortal><div onClick={closeModal} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 540, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
@@ -591,12 +592,12 @@ export default function ContentPlanner() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ── Smart Schedule Modal ─────────────────────────────────────────────── */}
       {schedOpen && (
-        <div onClick={() => !schedSaving && setSchedOpen(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => !schedSaving && setSchedOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()}
             style={{ width: '100%', maxWidth: 740, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .25s cubic-bezier(.2,.9,.3,1) both', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
 
@@ -737,7 +738,7 @@ export default function ContentPlanner() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )

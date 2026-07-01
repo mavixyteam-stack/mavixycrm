@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { dbCheckIn, dbCheckOut } from '@/lib/db'
 import { Sparkle, Bell, Search, Clock, Spinner, Check, X } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 export default function TopBar() {
   const { state, dispatch } = useApp()
@@ -162,7 +163,7 @@ export default function TopBar() {
 
       {/* Morning Brief Modal */}
       {state.briefOpen && (
-        <div onClick={() => dispatch({ type:'TOGGLE_BRIEF' })} className="modal-overlay">
+        <ModalPortal><div onClick={() => dispatch({ type:'TOGGLE_BRIEF' })} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, background:'var(--c-ink)', borderRadius:22, overflow:'hidden', boxShadow:'var(--shadow-modal)', animation:'popIn .26s cubic-bezier(.2,.9,.3,1) both', color:'#fff' }}>
             <div style={{ position:'relative', overflow:'hidden' }}>
               <div style={{ position:'absolute', width:240, height:240, borderRadius:'50%', background:'radial-gradient(circle,rgba(255,92,31,0.18),transparent 65%)', top:-100, right:-60 }} />
@@ -200,12 +201,12 @@ export default function TopBar() {
               </div>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* Notifications panel */}
       {state.notifOpen && (
-        <div onClick={() => dispatch({ type:'TOGGLE_NOTIF' })} style={{ position:'fixed', inset:0, zIndex:100 }}>
+        <ModalPortal><div onClick={() => dispatch({ type:'TOGGLE_NOTIF' })} style={{ position:'fixed', inset:0, zIndex:100 }}>
           <div onClick={e => e.stopPropagation()} style={{ position:'absolute', top:66, right:20, width:340, background:'#fff', borderRadius:16, border:'1px solid var(--c-border)', boxShadow:'0 20px 40px -15px rgba(0,0,0,.18)', overflow:'hidden', animation:'popIn .2s ease both' }}>
             <div style={{ padding:'14px 16px 10px', borderBottom:'1px solid var(--c-border-soft)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15 }}>Notifications</span>
@@ -228,7 +229,7 @@ export default function TopBar() {
               </div>
             ))}
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* Toast */}

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { Plus, X } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import type { Profile } from '@/types'
 
 const CAPACITY_MAX = 8
@@ -310,7 +311,7 @@ export default function TeamScreen() {
 
       {/* ── Add Member modal ─────────────────────────────────────────────────── */}
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setAddOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
@@ -387,12 +388,12 @@ export default function TeamScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ── Edit Member modal ────────────────────────────────────────────────── */}
       {editUser && (
-        <div onClick={() => setEditUser(null)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setEditUser(null)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -501,12 +502,12 @@ export default function TeamScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ── Delete confirmation modal ────────────────────────────────────────── */}
       {deleteTarget && (
-        <div onClick={() => !deleting && setDeleteTarget(null)} className="modal-overlay">
+        <ModalPortal><div onClick={() => !deleting && setDeleteTarget(null)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .2s cubic-bezier(.2,.9,.3,1) both', padding: '28px 24px' }}>
             <div style={{ width: 48, height: 48, borderRadius: 14, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -528,7 +529,7 @@ export default function TeamScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )

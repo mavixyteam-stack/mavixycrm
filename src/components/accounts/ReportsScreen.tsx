@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { Sparkle, Spinner, Check, X } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import type { Client, PlanItem } from '@/types'
 
 // ─── Client-Friendly Report View ─────────────────────────────────────────────
@@ -670,7 +671,7 @@ export default function ReportsScreen() {
 
       {/* Send to client modal */}
       {sendOpen && client && (
-        <div onClick={() => setSendOpen(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setSendOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()}
             style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -714,7 +715,7 @@ export default function ReportsScreen() {
                 style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid var(--c-border)', fontSize: 14, fontWeight: 600, color: 'var(--c-subtle)' }}>Cancel</button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )

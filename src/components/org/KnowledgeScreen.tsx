@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useToast } from '@/lib/store'
 import { Plus, X, Check, Sparkle, Spinner, Search } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const SEED_DOCS = [
   { id: 'k1', title: 'Brand Voice Guide', cat: 'Brand', content: 'Mavixy\'s tone is calm confidence meets creative wit. We avoid corporate jargon, never use exclamation marks in headers, and lead with results. Copy is always punchy, benefit-first, and written for the scroll.', tags: ['tone', 'writing', 'brand'], pinned: true },
@@ -144,7 +145,7 @@ export default function KnowledgeScreen() {
       )}
 
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setAddOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>New Document</div>
@@ -183,7 +184,7 @@ export default function KnowledgeScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )

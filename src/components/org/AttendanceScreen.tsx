@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useApp, useToast, useUpsertAttendanceRequest, useUpdateAttendanceRequest } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { Check, X, Plus, ChevronLeft, ChevronRight } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import type { AttendanceRecord, AttendanceRequest, LeaveType } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -550,7 +551,7 @@ export default function AttendanceScreen() {
 
       {/* ── Day Detail Modal ──────────────────────────────────────────────────── */}
       {dayModal && (
-        <div onClick={() => setDayModal(null)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setDayModal(null)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
 
             {/* Modal header */}
@@ -711,12 +712,12 @@ export default function AttendanceScreen() {
               )}
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ── Correction request modal ──────────────────────────────────────────── */}
       {corrModal && (
-        <div onClick={() => setCorrModal(null)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setCorrModal(null)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
@@ -761,12 +762,12 @@ export default function AttendanceScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ── Leave request modal ───────────────────────────────────────────────── */}
       {leaveModal && (
-        <div onClick={() => setLeaveModal(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setLeaveModal(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17 }}>Apply for leave</div>
@@ -825,12 +826,12 @@ export default function AttendanceScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ── Rejection modal ───────────────────────────────────────────────────── */}
       {rejectModal && (
-        <div onClick={() => setRejectModal(null)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setRejectModal(null)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .2s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--c-border-soft)' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>Reject request</div>
@@ -851,7 +852,7 @@ export default function AttendanceScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )

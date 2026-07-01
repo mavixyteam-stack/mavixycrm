@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { useApp, useToast, useUpsertPlanItem } from '@/lib/store'
 import { ChevronLeft, ChevronRight, Planner } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import { STATUS_PIPE } from '@/lib/seed-data'
 import type { PlanItem, ContentStatus } from '@/types'
 
@@ -340,7 +341,7 @@ export default function ContentCalendar() {
         const nextStatus = idx < order.length - 1 ? STATUS_PIPE[idx + 1] : null
 
         return (
-          <div onClick={() => setDetailId(null)} className="modal-overlay">
+          <ModalPortal><div onClick={() => setDetailId(null)} className="modal-overlay">
             <div onClick={e => e.stopPropagation()}
               style={{ width:'100%', maxWidth:520, background:'#fff', borderRadius:22, overflow:'hidden', boxShadow:'var(--shadow-modal)', animation:'popIn .26s cubic-bezier(.2,.9,.3,1) both' }}>
 
@@ -437,7 +438,7 @@ export default function ContentCalendar() {
               </div>
             </div>
           </div>
-        )
+        </ModalPortal>)
       })()}
     </div>
   )

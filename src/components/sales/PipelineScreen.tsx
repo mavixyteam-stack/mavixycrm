@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useApp, useToast, useUpsertDeal } from '@/lib/store'
 import { Plus, X, Check } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const STAGES = [
   { key: 'lead', label: 'Lead', color: '#9A9E94', bg: '#F0F1ED' },
@@ -158,7 +159,7 @@ export default function PipelineScreen() {
 
       {/* Add Deal Modal */}
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setAddOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>Add Deal</div>
@@ -216,7 +217,7 @@ export default function PipelineScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )
