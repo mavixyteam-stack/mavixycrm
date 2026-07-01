@@ -51,7 +51,7 @@ export default function DayPlanner() {
   const dayPlan = useMemo(() => {
     if (!selected) return { hours: 0, blocks: [] as { time: string; dur: string; title: string; client: string; tag?: string; tagColor?: string; barColor: string }[] }
 
-    const prRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
+    const prRank: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
     const userTasks = state.tasks
       .filter((t: { assignee_id: string; done: boolean }) => t.assignee_id === selected.id && !t.done)
       .sort((a: { priority: string }, b: { priority: string }) => (prRank[a.priority] ?? 1) - (prRank[b.priority] ?? 1))
@@ -79,17 +79,17 @@ export default function DayPlanner() {
 
     for (const task of userTasks.slice(0, 4)) {
       maybeAddLunch()
-      const durMins = task.priority === 'high' ? 90 : task.priority === 'medium' ? 60 : 45
+      const durMins = task.priority === 'High' ? 90 : task.priority === 'Medium' ? 60 : 45
       const client = task.client_id ? (clientMap.get(task.client_id) as { name: string } | undefined) : null
-      const barColor = task.priority === 'high' ? '#EF4444' : task.priority === 'medium' ? '#F59E0B' : '#22C55E'
-      const tag = task.priority === 'high' ? 'High priority' : task.priority === 'medium' ? 'Deep work' : undefined
+      const barColor = task.priority === 'High' ? '#EF4444' : task.priority === 'Medium' ? '#F59E0B' : '#22C55E'
+      const tag = task.priority === 'High' ? 'High priority' : task.priority === 'Medium' ? 'Deep work' : undefined
       blocks.push({
         time: toTimeStr(offset),
         dur: durStr(durMins),
         title: task.title,
         client: client?.name || '',
         tag,
-        tagColor: task.priority === 'high' ? '#EF4444' : '#F59E0B',
+        tagColor: task.priority === 'High' ? '#EF4444' : '#F59E0B',
         barColor,
       })
       offset += durMins
