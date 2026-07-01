@@ -166,7 +166,7 @@ export default function ContentPlanner() {
   async function saveItem() {
     if (!modal.item?.title?.trim()) return
     const item: PlanItem = {
-      id: modal.item!.id || `item-${Date.now()}`,
+      id: modal.item!.id || crypto.randomUUID(),
       month: monthKey,
       client_id: modal.clientId,
       cat: modal.cat,

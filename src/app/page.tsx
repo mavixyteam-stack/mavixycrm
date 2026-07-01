@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useApp, AppProvider } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import Login from '@/components/shell/Login'
@@ -24,6 +24,45 @@ import KnowledgeScreen from '@/components/org/KnowledgeScreen'
 import AttendanceScreen from '@/components/org/AttendanceScreen'
 import { Sparkle } from '@/components/ui/Icon'
 import type { Screen, Role } from '@/types'
+
+// ─── URL ↔ Screen mapping ─────────────────────────────────────────────────────
+const SCREEN_PATHS: Record<string, Screen> = {
+  '/': 'myday',
+  '/planner': 'planner',
+  '/calendar': 'calendar',
+  '/content': 'contentplan',
+  '/clients': 'clients',
+  '/reports': 'reports',
+  '/inbox': 'inbox',
+  '/pipeline': 'pipeline',
+  '/leads': 'leads',
+  '/team': 'team',
+  '/performance': 'performance',
+  '/permissions': 'permissions',
+  '/connections': 'connections',
+  '/automations': 'automations',
+  '/knowledge': 'knowledge',
+  '/attendance': 'attendance',
+}
+
+const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
+  myday: '/',
+  planner: '/planner',
+  calendar: '/calendar',
+  contentplan: '/content',
+  clients: '/clients',
+  reports: '/reports',
+  inbox: '/inbox',
+  pipeline: '/pipeline',
+  leads: '/leads',
+  team: '/team',
+  performance: '/performance',
+  permissions: '/permissions',
+  connections: '/connections',
+  automations: '/automations',
+  knowledge: '/knowledge',
+  attendance: '/attendance',
+}
 
 // ─── RBAC matrix ─────────────────────────────────────────────────────────────
 const ROLE_SCREENS: Record<Role, Screen[]> = {
@@ -78,6 +117,7 @@ function AppShell() {
   const { state, dispatch } = useApp()
   const sb = createClient()
   const role = (state.currentUser?.role || 'employee') as Role
+  const isPopState = useRef(false)
 
   // Redirect to allowed screen if current screen is blocked
   useEffect(() => {
@@ -85,6 +125,48 @@ function AppShell() {
       dispatch({ type: 'SET_SCREEN', screen: defaultScreen(role) })
     }
   }, [role, state.screen, state.isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync screen → URL
+  useEffect(() => {
+    if (!state.isLoggedIn) return
+    if (isPopState.current) { isPopState.current = false; return }
+    const path = state.screen === 'client-detail' && state.selectedClientId
+      ? `/clients/${state.selectedClientId}`
+      : (SCREEN_TO_PATH[state.screen] || '/')
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path)
+    }
+  }, [state.screen, state.selectedClientId, state.isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPop = () => {
+      isPopState.current = true
+      const path = window.location.pathname
+      const clientMatch = path.match(/^\/clients\/([0-9a-f-]{36})$/)
+      if (clientMatch) {
+        dispatch({ type: 'SET_CLIENT_DETAIL', clientId: clientMatch[1] })
+        return
+      }
+      const screen = SCREEN_PATHS[path] || 'myday'
+      dispatch({ type: 'SET_SCREEN', screen })
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [dispatch])
+
+  // Parse URL on first login (handles deep links and refreshes)
+  useEffect(() => {
+    if (!state.isLoggedIn) return
+    const path = window.location.pathname
+    const clientMatch = path.match(/^\/clients\/([0-9a-f-]{36})$/)
+    if (clientMatch) {
+      dispatch({ type: 'SET_CLIENT_DETAIL', clientId: clientMatch[1] })
+      return
+    }
+    const screen = SCREEN_PATHS[path]
+    if (screen && screen !== state.screen) dispatch({ type: 'SET_SCREEN', screen })
+  }, [state.isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (state.authLoading) {
     return (

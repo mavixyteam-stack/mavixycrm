@@ -43,7 +43,7 @@ export default function PipelineScreen() {
   function addDeal() {
     if (!form.name.trim() || !form.company.trim()) return
     const deal = {
-      id: `deal-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: form.name,
       company: form.company,
       value: Number(form.value) || 0,

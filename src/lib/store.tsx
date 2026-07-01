@@ -1,12 +1,13 @@
 'use client'
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
 import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client } from '@/types'
-import { SEED_CLIENTS, SEED_TEAM } from './seed-data'
 import { createClient } from './supabase/client'
 import {
-  loadWorkspace, seedDemoData,
+  loadWorkspace,
   dbUpsertPlanItem, dbDeletePlanItem,
-  dbUpsertClient, dbUpsertTask, dbUpsertDeal,
+  dbUpsertClient, dbDeleteClient,
+  dbUpsertTask, dbUpsertDeal,
+  dbUpsertAttendanceRequest, dbUpdateAttendanceRequest,
 } from './db'
 
 interface AppState {
@@ -41,7 +42,7 @@ type Action =
   | { type: 'SET_USER'; user: Profile }
   | { type: 'LOGOUT' }
   | { type: 'AUTH_LOADED' }
-  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendance: AttendanceRecord[] }
+  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendanceRequests: AttendanceRequest[] }
   | { type: 'SET_PLAN_ITEMS'; items: PlanItem[] }
   | { type: 'UPSERT_PLAN_ITEM'; item: PlanItem }
   | { type: 'DELETE_PLAN_ITEM'; id: string }
@@ -76,8 +77,8 @@ const initial: AppState = {
   currentUser: null,
   isLoggedIn: false,
   authLoading: true,
-  users: SEED_TEAM as any[],
-  clients: SEED_CLIENTS as any[],
+  users: [],
+  clients: [],
   planItems: [],
   tasks: [],
   attendance: [],
@@ -111,12 +112,12 @@ function reducer(state: AppState, action: Action): AppState {
     case 'LOGOUT': return { ...initial, isLoggedIn: false, authLoading: false }
     case 'SET_WORKSPACE': return {
       ...state,
-      clients: action.clients.length ? action.clients : state.clients,
+      clients: action.clients,
       planItems: action.planItems,
       tasks: action.tasks,
       deals: action.deals,
-      users: action.users.length ? action.users : state.users,
-      attendance: action.attendance,
+      users: action.users,
+      attendanceRequests: action.attendanceRequests,
     }
     case 'SET_PLAN_ITEMS': return { ...state, planItems: action.items }
     case 'UPSERT_PLAN_ITEM': return { ...state, planItems: upsert(state.planItems, action.item) }
@@ -125,7 +126,13 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPSERT_TASK': return { ...state, tasks: upsert(state.tasks, action.task) }
     case 'SET_CLIENTS': return { ...state, clients: action.clients }
     case 'UPSERT_CLIENT': return { ...state, clients: upsert(state.clients, action.client) }
-    case 'DELETE_CLIENT': return { ...state, clients: state.clients.filter(x => x.id !== action.id), selectedClientId: state.selectedClientId === action.id ? null : state.selectedClientId }
+    case 'DELETE_CLIENT': return {
+      ...state,
+      clients: state.clients.filter(x => x.id !== action.id),
+      planItems: state.planItems.filter(x => x.client_id !== action.id),
+      tasks: state.tasks.filter(x => x.client_id !== action.id),
+      selectedClientId: state.selectedClientId === action.id ? null : state.selectedClientId,
+    }
     case 'SET_USERS': return { ...state, users: action.users }
     case 'UPSERT_USER': return { ...state, users: upsert(state.users, action.user) }
     case 'DELETE_USER': return { ...state, users: state.users.filter(x => x.id !== action.id) }
@@ -163,7 +170,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial)
   const sb = createClient()
 
-  // ── Boot: check existing session ─────────────────────────────────────────
   useEffect(() => {
     sb.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
@@ -194,16 +200,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
   try {
     const data = await loadWorkspace()
-    // Auto-seed demo data if this is a fresh workspace
-    if (data.clients.length === 0) {
-      const seeded = await seedDemoData()
-      if (seeded) {
-        const fresh = await loadWorkspace()
-        dispatch({ type: 'SET_WORKSPACE', clients: fresh.clients, planItems: fresh.planItems, tasks: fresh.tasks, deals: fresh.deals, users: fresh.profiles, attendance: fresh.attendance })
-        return
-      }
-    }
-    dispatch({ type: 'SET_WORKSPACE', clients: data.clients, planItems: data.planItems, tasks: data.tasks, deals: data.deals, users: data.profiles, attendance: data.attendance })
+    dispatch({
+      type: 'SET_WORKSPACE',
+      clients: data.clients,
+      planItems: data.planItems,
+      tasks: data.tasks,
+      deals: data.deals,
+      users: data.profiles,
+      attendanceRequests: data.attendanceRequests,
+    })
   } catch (e) {
     console.error('fetchWorkspace', e)
   }
@@ -243,8 +248,9 @@ export function useDeletePlanItem() {
 
 export function useDeleteClient() {
   const { dispatch } = useApp()
-  return useCallback((id: string) => {
+  return useCallback(async (id: string) => {
     dispatch({ type: 'DELETE_CLIENT', id })
+    await dbDeleteClient(id)
   }, [dispatch])
 }
 
@@ -274,14 +280,16 @@ export function useUpsertDeal() {
 
 export function useUpsertAttendanceRequest() {
   const { dispatch } = useApp()
-  return useCallback((request: AttendanceRequest) => {
+  return useCallback(async (request: AttendanceRequest) => {
     dispatch({ type: 'UPSERT_ATT_REQUEST', request })
+    await dbUpsertAttendanceRequest(request)
   }, [dispatch])
 }
 
 export function useUpdateAttendanceRequest() {
   const { dispatch } = useApp()
-  return useCallback((id: string, status: 'approved' | 'rejected', reviewed_by: string, rejection_reason?: string) => {
+  return useCallback(async (id: string, status: 'approved' | 'rejected', reviewed_by: string, rejection_reason?: string) => {
     dispatch({ type: 'UPDATE_ATT_REQUEST', id, status, reviewed_by, rejection_reason })
+    await dbUpdateAttendanceRequest(id, status, reviewed_by, rejection_reason)
   }, [dispatch])
 }

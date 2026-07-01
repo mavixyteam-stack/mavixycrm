@@ -131,7 +131,7 @@ export default function AttendanceScreen() {
     if (!corrForm.reason.trim()) { toast('Please add a reason'); return }
     if (!corrForm.checkIn || !corrForm.checkOut) { toast('Please fill in both times'); return }
     const req: AttendanceRequest = {
-      id: `req-${Date.now()}`,
+      id: crypto.randomUUID(),
       user_id: state.currentUser!.id,
       type: 'correction',
       date: corrModal!.date,
@@ -155,7 +155,7 @@ export default function AttendanceScreen() {
     if (!leaveForm.start || !leaveForm.end) { toast('Please select dates'); return }
     if (!leaveForm.reason.trim()) { toast('Please add a reason'); return }
     const req: AttendanceRequest = {
-      id: `req-${Date.now()}`,
+      id: crypto.randomUUID(),
       user_id: state.currentUser!.id,
       type: 'leave',
       date: leaveForm.start,

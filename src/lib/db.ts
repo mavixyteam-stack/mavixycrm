@@ -1,26 +1,24 @@
 import { createClient } from './supabase/client'
-import { SEED_CLIENTS, SEED_TEAM, SEED_PLAN_ITEMS } from './seed-data'
-import type { PlanItem, Task, Deal, Client } from '@/types'
+import type { PlanItem, Task, Deal, Client, AttendanceRequest } from '@/types'
 
 // ─── Load all workspace data after login ─────────────────────────────────────
 
 export async function loadWorkspace() {
   const sb = createClient()
-  const today = new Date().toISOString().split('T')[0]
   const [
     { data: clients },
     { data: planItems },
     { data: tasks },
     { data: deals },
     { data: profiles },
-    { data: attendance },
+    { data: attReqs },
   ] = await Promise.all([
     sb.from('clients').select('*').order('created_at'),
     sb.from('plan_items').select('*').order('created_at'),
     sb.from('tasks').select('*').order('created_at'),
     sb.from('deals').select('*').order('created_at'),
     sb.from('profiles').select('*').order('created_at'),
-    sb.from('attendance').select('*').eq('date', today),
+    sb.from('attendance_requests').select('*').order('created_at', { ascending: false }),
   ])
   return {
     clients: clients || [],
@@ -28,69 +26,8 @@ export async function loadWorkspace() {
     tasks: tasks || [],
     deals: deals || [],
     profiles: profiles || [],
-    attendance: attendance || [],
+    attendanceRequests: attReqs || [],
   }
-}
-
-// ─── Seed demo data for first-time users ─────────────────────────────────────
-
-export async function seedDemoData() {
-  const sb = createClient()
-
-  // Insert seed clients
-  const clientRows = SEED_CLIENTS.map(c => ({
-    name: c.name,
-    initials: c.initials,
-    color: c.color,
-    health: c.health,
-    services: c.services,
-    type: c.type,
-  }))
-  const { data: insertedClients, error: ce } = await sb
-    .from('clients')
-    .insert(clientRows)
-    .select()
-  if (ce || !insertedClients) return null
-
-  // Build slug → UUID map
-  const slugMap: Record<string, string> = {}
-  insertedClients.forEach((c: any, i: number) => {
-    slugMap[SEED_CLIENTS[i].id] = c.id
-  })
-
-  // Get current profiles to map assignees
-  const { data: profiles } = await sb.from('profiles').select('id, name, initials, color, title')
-  const profileMap: Record<string, string> = {}
-  if (profiles) {
-    SEED_TEAM.forEach(st => {
-      const match = profiles.find((p: any) =>
-        p.name?.toLowerCase().includes(st.name.split(' ')[0].toLowerCase())
-      )
-      if (match) profileMap[st.id] = match.id
-    })
-  }
-
-  // Default to first profile for unmatched assignees
-  const defaultAssigneeId = profiles?.[0]?.id || null
-
-  // Insert seed plan items
-  const planRows = (SEED_PLAN_ITEMS as any[]).map(it => ({
-    month: it.month,
-    client_id: slugMap[it.client_id] || null,
-    cat: it.cat,
-    type: it.type,
-    title: it.title,
-    brief: it.brief,
-    refs: it.refs,
-    assignee_id: profileMap[it.assignee_id] || defaultAssigneeId,
-    effort: it.effort,
-    day: it.day,
-    status: it.status,
-  }))
-
-  await sb.from('plan_items').insert(planRows)
-
-  return { clients: insertedClients, slugMap }
 }
 
 // ─── Plan items ───────────────────────────────────────────────────────────────
@@ -106,7 +43,7 @@ export async function dbUpsertPlanItem(item: PlanItem) {
     title: item.title,
     brief: item.brief,
     refs: item.refs,
-    assignee_id: item.assignee_id,
+    assignee_id: item.assignee_id || null,
     effort: item.effort,
     day: item.day,
     status: item.status,
@@ -135,7 +72,7 @@ export async function dbUpsertClient(client: Client) {
     contact_name: client.contact_name,
     contact_email: client.contact_email,
     whatsapp: client.whatsapp,
-    account_owner_id: client.account_owner_id,
+    account_owner_id: client.account_owner_id || null,
     posts_per_month: client.posts_per_month,
     monthly_retainer: client.monthly_retainer,
     ai_brief: client.ai_brief,
@@ -143,8 +80,18 @@ export async function dbUpsertClient(client: Client) {
     target_audience: client.target_audience,
     brand_voice: client.brand_voice,
     reference_links: client.reference_links,
+    connections: client.connections || {},
   })
   if (error) console.error('upsertClient', error)
+}
+
+export async function dbDeleteClient(id: string) {
+  const sb = createClient()
+  // Cascade: delete related plan items and tasks first
+  await sb.from('plan_items').delete().eq('client_id', id)
+  await sb.from('tasks').delete().eq('client_id', id)
+  const { error } = await sb.from('clients').delete().eq('id', id)
+  if (error) console.error('deleteClient', error)
 }
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
@@ -154,9 +101,9 @@ export async function dbUpsertTask(task: Task) {
   const { error } = await sb.from('tasks').upsert({
     id: task.id,
     title: task.title,
-    client_id: task.client_id,
+    client_id: task.client_id || null,
     type: task.type,
-    assignee_id: task.assignee_id,
+    assignee_id: task.assignee_id || null,
     due: task.due,
     priority: task.priority,
     done: task.done,
@@ -179,7 +126,45 @@ export async function dbUpsertDeal(deal: Deal) {
     value: deal.value,
     stage: deal.stage,
     probability: deal.probability,
-    owner_id: deal.owner_id,
+    owner_id: deal.owner_id || null,
   })
   if (error) console.error('upsertDeal', error)
+}
+
+// ─── Attendance requests ──────────────────────────────────────────────────────
+
+export async function dbUpsertAttendanceRequest(req: AttendanceRequest) {
+  const sb = createClient()
+  const { error } = await sb.from('attendance_requests').upsert({
+    id: req.id,
+    user_id: req.user_id,
+    type: req.type,
+    date: req.date,
+    leave_end: req.leave_end || null,
+    leave_type: req.leave_type || null,
+    check_in: req.check_in || null,
+    check_out: req.check_out || null,
+    reason: req.reason,
+    status: req.status,
+    reviewed_by: req.reviewed_by || null,
+    reviewed_at: req.reviewed_at || null,
+    rejection_reason: req.rejection_reason || null,
+  })
+  if (error) console.error('upsertAttendanceRequest', error)
+}
+
+export async function dbUpdateAttendanceRequest(
+  id: string,
+  status: 'approved' | 'rejected',
+  reviewed_by: string,
+  rejection_reason?: string,
+) {
+  const sb = createClient()
+  const { error } = await sb.from('attendance_requests').update({
+    status,
+    reviewed_by,
+    reviewed_at: new Date().toISOString(),
+    rejection_reason: rejection_reason || null,
+  }).eq('id', id)
+  if (error) console.error('updateAttendanceRequest', error)
 }

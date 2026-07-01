@@ -11,7 +11,7 @@ function parseMonth(key: string) {
 }
 function monthLabel(key: string) {
   const { y, m } = parseMonth(key)
-  return ['January','February','March','April','May','June','July','August','September','October','November','December'][m] + ' ' + y
+  return ['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1] + ' ' + y
 }
 function weekNum(day: number): number {
   return Math.ceil(day / 7)
@@ -31,10 +31,7 @@ const WEEK_RANGES = [
   { key: 'month', label: 'This Month' },
 ] as const
 
-const CLIENT_COLORS: Record<string, string> = {
-  sunso: '#FF5C1F', lumio: '#3B82F6', elysian: '#10B981',
-  verve: '#EF4444', weekend: '#8B5CF6',
-}
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function getMonthKey() {
   const d = new Date()
@@ -66,7 +63,7 @@ export default function ContentCalendar() {
   const [detailId, setDetailId] = useState<string|null>(null)
   const now = new Date()
   const { y: my, m: mm } = parseMonth(monthKey)
-  const isCurMonth = now.getFullYear() === my && now.getMonth() === mm
+  const isCurMonth = now.getFullYear() === my && now.getMonth() + 1 === mm
   const todayDate = now.getDate()
 
   const allItems = state.planItems
@@ -90,8 +87,8 @@ export default function ContentCalendar() {
   function shiftMonth(delta: number) {
     let { y, m } = parseMonth(monthKey)
     m += delta
-    if (m < 0) { m = 11; y-- }
-    if (m > 11) { m = 0; y++ }
+    if (m < 1) { m = 12; y-- }
+    if (m > 12) { m = 1; y++ }
     setMonthKey(y + '-' + m)
   }
 
@@ -111,7 +108,11 @@ export default function ContentCalendar() {
   }
 
   function deadlineLabel(it: PlanItem) {
-    if (it.status === 'published') return { label: it.day ? `Posted Jun ${it.day}` : 'Posted', c:'#2563EB', bg:'#EFF6FF', overdue:false }
+    if (it.status === 'published') {
+      const { m } = parseMonth(it.month)
+      const mon = MONTH_SHORT[m - 1] || ''
+      return { label: it.day ? `Posted ${mon} ${it.day}` : 'Posted', c:'#2563EB', bg:'#EFF6FF', overdue:false }
+    }
     if (it.day == null) return { label: 'Not scheduled', c:'var(--c-faint)', bg:'var(--c-fill)', overdue:false }
     if (!isCurMonth) return { label: weekLabel(it.day) || '', c:'var(--c-muted)', bg:'var(--c-fill)', overdue:false }
     const diff = it.day - todayDate
@@ -267,7 +268,7 @@ export default function ContentCalendar() {
                       style={{
                         background:'#fff',
                         border:`1px solid ${dl.overdue ? '#FCA5A580' : 'var(--c-border-soft)'}`,
-                        borderLeft:`3px solid ${c.color || CLIENT_COLORS[it.client_id] || '#ccc'}`,
+                        borderLeft:`3px solid ${c.color || '#ccc'}`,
                         borderRadius:11, padding:'11px 12px', cursor:'grab',
                         marginBottom:8, opacity: isDragging ? .3 : 1,
                         boxShadow:'0 1px 3px rgba(16,17,12,.06)',
@@ -363,7 +364,7 @@ export default function ContentCalendar() {
                   <span style={{ fontSize:11.5, fontWeight:700, color:tc.c, background:tc.bg, borderRadius:7, padding:'4px 10px' }}>{detailItem.type}</span>
                   {detailItem.day && (
                     <span style={{ fontSize:11.5, fontWeight:700, color:'#2563EB', background:'#EFF6FF', borderRadius:7, padding:'4px 10px' }}>
-                      {new Date(my, mm, detailItem.day).toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' })}
+                      {new Date(my, mm - 1, detailItem.day).toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' })}
                     </span>
                   )}
                   <span style={{ fontSize:11.5, fontWeight:700, borderRadius:7, padding:'4px 10px', color:st.c, background:st.bg }}>{st.label}</span>

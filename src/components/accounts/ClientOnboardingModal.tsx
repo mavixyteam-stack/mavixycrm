@@ -74,7 +74,7 @@ export default function ClientOnboardingModal({ onClose }: Props) {
     const initials = form.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
     const contentServices = form.services.filter(s => ['social','performance','seo'].includes(s))
     const client: Client = {
-      id: `client-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: form.name.trim(),
       initials,
       color: form.color,
