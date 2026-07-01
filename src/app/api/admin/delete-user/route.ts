@@ -35,8 +35,17 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
   )
 
-  const { error } = await admin.auth.admin.deleteUser(user_id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  // Try to delete from Supabase Auth
+  const { error: authError } = await admin.auth.admin.deleteUser(user_id)
+
+  // If auth user doesn't exist (ghost profile — created before service key was configured),
+  // fall through and just delete the profile row so it disappears from the UI.
+  if (authError && !authError.message.toLowerCase().includes('not found') && !authError.message.toLowerCase().includes('user not found')) {
+    return NextResponse.json({ error: authError.message }, { status: 400 })
+  }
+
+  // Always delete the profile row (cascade handles related data)
+  await admin.from('profiles').delete().eq('id', user_id)
 
   return NextResponse.json({ ok: true })
 }

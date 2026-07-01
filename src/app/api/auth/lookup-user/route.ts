@@ -17,21 +17,20 @@ export async function POST(req: NextRequest) {
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
   const q = query.trim().toLowerCase()
 
-  // Search by full name (case-insensitive), then by first name
-  const { data } = await admin
-    .from('profiles')
-    .select('email, name')
-    .or(`name.ilike.${q},name.ilike.${q} %,email.ilike.${q}`)
-    .limit(5)
+  // Fetch all profiles and filter in JS to avoid Supabase .or() escaping issues with spaces
+  const { data } = await admin.from('profiles').select('email, name').limit(200)
 
   if (!data || data.length === 0) {
     return NextResponse.json({ email: null })
   }
 
-  // Prefer exact name match, then first-name match, then email match
+  // Exact full name match first, then first-name match, then email prefix match
   const exact = data.find(p => p.name.toLowerCase() === q)
-  const firstName = data.find(p => p.name.toLowerCase().startsWith(q + ' ') || p.name.toLowerCase() === q)
-  const match = exact || firstName || data[0]
+  const firstName = data.find(p => p.name.toLowerCase().split(' ')[0] === q)
+  const emailPrefix = data.find(p => p.email.toLowerCase().startsWith(q))
 
+  const match = exact || firstName || emailPrefix
+
+  if (!match) return NextResponse.json({ email: null })
   return NextResponse.json({ email: match.email, name: match.name })
 }
