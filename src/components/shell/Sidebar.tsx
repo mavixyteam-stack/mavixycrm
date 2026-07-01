@@ -1,7 +1,11 @@
 'use client'
-import { useApp } from '@/lib/store'
-import { Sparkle, Calendar, BarChart, Building, Users, TrendUp, Book, Settings, Zap, Inbox, FileText, Globe, LogOut } from '@/components/ui/Icon'
+import { useState } from 'react'
+import { useApp, useToast } from '@/lib/store'
+import { Sparkle, Calendar, BarChart, Building, Users, TrendUp, Book, Settings, Zap, Inbox, FileText, Globe, LogOut, X } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import type { Screen } from '@/types'
+
+const COLORS = ['#0EA5A4','#FB7185','#6366F1','#F4B740','#8B5CF6','#2563EB','#10B981','#EF4444','#FF5C1F']
 
 const NAV = [
   {
@@ -44,7 +48,46 @@ const NAV = [
 
 export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
   const { state, dispatch } = useApp()
+  const toast = useToast()
   const role = state.currentUser?.role || 'employee'
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileForm, setProfileForm] = useState({ name: '', color: '', new_password: '', confirm_password: '', showPass: false })
+  const [saving, setSaving] = useState(false)
+
+  function openProfile() {
+    setProfileForm({ name: state.currentUser?.name || '', color: state.currentUser?.color || '#0EA5A4', new_password: '', confirm_password: '', showPass: false })
+    setProfileOpen(true)
+  }
+
+  async function saveProfile() {
+    if (profileForm.new_password && profileForm.new_password !== profileForm.confirm_password) {
+      toast('Passwords do not match'); return
+    }
+    if (profileForm.new_password && profileForm.new_password.length < 6) {
+      toast('Password must be at least 6 characters'); return
+    }
+    setSaving(true)
+    try {
+      const body: Record<string, string> = {}
+      if (profileForm.name.trim() && profileForm.name.trim() !== state.currentUser?.name) body.name = profileForm.name.trim()
+      if (profileForm.color !== state.currentUser?.color) body.color = profileForm.color
+      if (profileForm.new_password) body.new_password = profileForm.new_password
+      if (!Object.keys(body).length) { setProfileOpen(false); setSaving(false); return }
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast(`Error: ${data.error}`); setSaving(false); return }
+      if (body.name || body.color) {
+        const initials = (body.name || state.currentUser?.name || '').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+        dispatch({ type: 'UPSERT_USER', user: { ...state.currentUser!, name: body.name || state.currentUser!.name, initials, color: body.color || state.currentUser!.color } })
+      }
+      toast(profileForm.new_password ? 'Profile updated & password changed' : 'Profile updated')
+      setProfileOpen(false)
+    } catch { toast('Failed to save') }
+    setSaving(false)
+  }
 
   const ROLE_SCREENS: Record<string, string[]> = {
     owner:    ['myday','planner','calendar','contentplan','clients','client-detail','reports','inbox','pipeline','leads','team','performance','permissions','connections','automations','knowledge','attendance'],
@@ -101,13 +144,13 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
       <div style={{ padding:'10px 10px', borderTop:'1px solid var(--c-border-soft)' }}>
         {state.currentUser && (
           <div style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 4px' }}>
-            <div style={{ width:32, height:32, borderRadius:9, background: state.currentUser.color || '#0EA5A4', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:11, flexShrink:0 }}>
+            <button onClick={openProfile} title="My profile" style={{ width:32, height:32, borderRadius:9, background: state.currentUser.color || '#0EA5A4', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:11, flexShrink:0, cursor:'pointer', border:'none' }}>
               {state.currentUser.initials}
-            </div>
-            <div style={{ flex:1, minWidth:0 }}>
+            </button>
+            <button onClick={openProfile} style={{ flex:1, minWidth:0, textAlign:'left', background:'none', border:'none', cursor:'pointer', padding:0 }}>
               <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:'#0F172A' }}>{state.currentUser.name}</div>
               <div style={{ fontSize:11, color:'var(--c-faint)', textTransform:'capitalize' }}>{state.currentUser.role}</div>
-            </div>
+            </button>
             <button onClick={onLogout || (() => dispatch({ type:'LOGOUT' }))} title="Sign out"
               style={{ width:28, height:28, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--c-ghost)', flexShrink:0 }}
               onMouseEnter={e => { e.currentTarget.style.background='var(--c-fill)'; e.currentTarget.style.color='var(--c-muted)' }}
@@ -118,6 +161,88 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
           </div>
         )}
       </div>
+
+      {/* Profile modal */}
+      {profileOpen && state.currentUser && (
+        <ModalPortal>
+          <div onClick={() => setProfileOpen(false)} className="modal-overlay">
+            <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:420, background:'#fff', borderRadius:20, overflow:'hidden', boxShadow:'var(--shadow-modal)', animation:'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
+              <div style={{ padding:'20px 22px', borderBottom:'1px solid var(--c-border-soft)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:11 }}>
+                  <div style={{ width:40, height:40, borderRadius:12, background:profileForm.color, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:14 }}>
+                    {state.currentUser.initials}
+                  </div>
+                  <div>
+                    <div style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:16 }}>My Profile</div>
+                    <div style={{ fontSize:12, color:'var(--c-faint)' }}>{state.currentUser.email}</div>
+                  </div>
+                </div>
+                <button onClick={() => setProfileOpen(false)} style={{ width:30, height:30, borderRadius:8, background:'var(--c-fill)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                  <X size={13} color="var(--c-ghost)" />
+                </button>
+              </div>
+
+              <div style={{ padding:'18px 22px', display:'flex', flexDirection:'column', gap:14 }}>
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--c-muted)', display:'block', marginBottom:5 }}>Display Name</label>
+                  <input value={profileForm.name} onChange={e => setProfileForm(f => ({ ...f, name: e.target.value }))}
+                    style={{ width:'100%', border:'1.5px solid var(--c-border)', borderRadius:10, padding:'10px 12px', fontSize:14 }}
+                    onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--c-muted)', display:'block', marginBottom:7 }}>Avatar Color</label>
+                  <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
+                    {COLORS.map(c => (
+                      <button key={c} onClick={() => setProfileForm(f => ({ ...f, color: c }))}
+                        style={{ width:28, height:28, borderRadius:8, background:c, border:`2.5px solid ${profileForm.color === c ? 'var(--c-ink)' : 'transparent'}`, transition:'border-color .12s', cursor:'pointer' }} />
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ paddingTop:4, borderTop:'1px solid var(--c-border-soft)' }}>
+                  <label style={{ fontSize:12, fontWeight:600, color:'var(--c-muted)', display:'block', marginBottom:5 }}>
+                    New Password <span style={{ fontWeight:400 }}>(leave blank to keep current)</span>
+                  </label>
+                  <div style={{ position:'relative' }}>
+                    <input type={profileForm.showPass ? 'text' : 'password'} value={profileForm.new_password}
+                      onChange={e => setProfileForm(f => ({ ...f, new_password: e.target.value }))}
+                      placeholder="Min 6 characters"
+                      style={{ width:'100%', border:'1.5px solid var(--c-border)', borderRadius:10, padding:'10px 46px 10px 12px', fontSize:14 }}
+                      onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
+                    <button onClick={() => setProfileForm(f => ({ ...f, showPass: !f.showPass }))} type="button"
+                      style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color:'var(--c-ghost)', background:'none', fontSize:12, fontWeight:600 }}>
+                      {profileForm.showPass ? 'hide' : 'show'}
+                    </button>
+                  </div>
+                </div>
+
+                {profileForm.new_password && (
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, color:'var(--c-muted)', display:'block', marginBottom:5 }}>Confirm Password</label>
+                    <input type="password" value={profileForm.confirm_password}
+                      onChange={e => setProfileForm(f => ({ ...f, confirm_password: e.target.value }))}
+                      placeholder="Re-enter new password"
+                      style={{ width:'100%', border:`1.5px solid ${profileForm.confirm_password && profileForm.confirm_password !== profileForm.new_password ? '#EF4444' : 'var(--c-border)'}`, borderRadius:10, padding:'10px 12px', fontSize:14 }}
+                      onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor = profileForm.confirm_password && profileForm.confirm_password !== profileForm.new_password ? '#EF4444' : 'var(--c-border)'} />
+                    {profileForm.confirm_password && profileForm.confirm_password !== profileForm.new_password && (
+                      <div style={{ fontSize:12, color:'#EF4444', marginTop:4 }}>Passwords don't match</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding:'14px 22px', borderTop:'1px solid var(--c-border-soft)', display:'flex', gap:10 }}>
+                <button onClick={() => setProfileOpen(false)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1.5px solid var(--c-border)', fontSize:14, fontWeight:600, color:'var(--c-subtle)', cursor:'pointer' }}>Cancel</button>
+                <button onClick={saveProfile} disabled={saving}
+                  style={{ flex:2, padding:'10px', borderRadius:10, background:'var(--c-ink)', color:'#fff', fontSize:14, fontWeight:700, opacity:saving ? .7 : 1, cursor:'pointer' }}>
+                  {saving ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </div>
   )
 }
