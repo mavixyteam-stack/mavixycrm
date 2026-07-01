@@ -60,6 +60,7 @@ export default function ContentPlanner() {
   const [modal, setModal] = useState<ModalState>({ open: false, item: null, clientId: '', cat: 'social' })
   const [aiLoading, setAiLoading] = useState(false)
   const [ideaIdx, setIdeaIdx] = useState(0)
+  const [refInput, setRefInput] = useState('')
 
   // Smart schedule state
   const [schedOpen, setSchedOpen] = useState(false)
@@ -443,6 +444,7 @@ export default function ContentPlanner() {
                   </div>
                 </div>
               </div>
+              {/* Type */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Type</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
@@ -454,18 +456,97 @@ export default function ContentPlanner() {
                   ))}
                 </div>
               </div>
+
+              {/* Assign to */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 7 }}>Assign to</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {/* Unassigned option */}
+                  <button
+                    onClick={() => setModal(m => ({ ...m, item: { ...m.item!, assignee_id: '' } }))}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 20, border: `1.5px solid ${!modal.item!.assignee_id ? 'var(--c-accent)' : 'var(--c-border)'}`, background: !modal.item!.assignee_id ? 'rgba(255,92,31,.06)' : '#fff', cursor: 'pointer', transition: 'all .12s' }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--c-fill)', border: '1.5px dashed var(--c-rule)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--c-ghost)" strokeWidth="2.5" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: !modal.item!.assignee_id ? 'var(--c-accent)' : 'var(--c-muted)' }}>Unassigned</span>
+                  </button>
+                  {state.users.map(u => {
+                    const isSelected = modal.item!.assignee_id === u.id
+                    return (
+                      <button key={u.id}
+                        onClick={() => setModal(m => ({ ...m, item: { ...m.item!, assignee_id: u.id } }))}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 20, border: `1.5px solid ${isSelected ? 'var(--c-accent)' : 'var(--c-border)'}`, background: isSelected ? 'rgba(255,92,31,.06)' : '#fff', cursor: 'pointer', transition: 'all .12s' }}
+                        onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--c-fill)' }}
+                        onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#fff' }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, flexShrink: 0 }}>{u.initials}</div>
+                        <span style={{ fontSize: 12.5, fontWeight: isSelected ? 700 : 500, color: isSelected ? 'var(--c-accent)' : 'var(--c-ink)', whiteSpace: 'nowrap' }}>{u.name.split(' ')[0]}</span>
+                        {u.title && <span style={{ fontSize: 11, color: 'var(--c-faint)', whiteSpace: 'nowrap' }}>· {u.title}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Title */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Title</label>
                 <input value={modal.item!.title || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, title: e.target.value } }))} placeholder="e.g. Glow ritual — 3-step routine"
                   style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }}
                   onFocus={e => e.target.style.borderColor = 'var(--c-ink)'} onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
               </div>
+
+              {/* Brief */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Brief</label>
                 <textarea value={modal.item!.brief || ''} onChange={e => setModal(m => ({ ...m, item: { ...m.item!, brief: e.target.value } }))}
                   rows={3} placeholder="Describe the content direction, references, key elements..."
                   style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, resize: 'vertical' }}
                   onFocus={e => e.target.style.borderColor = 'var(--c-ink)'} onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
+              </div>
+
+              {/* Inspiration links */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 7 }}>Inspiration links</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={refInput}
+                    onChange={e => setRefInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && refInput.trim()) {
+                        e.preventDefault()
+                        setModal(m => ({ ...m, item: { ...m.item!, refs: [...(m.item!.refs || []), { label: refInput.trim() }] } }))
+                        setRefInput('')
+                      }
+                    }}
+                    placeholder="Paste a link or note (e.g. Glossier routine reel)"
+                    style={{ flex: 1, border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '9px 12px', fontSize: 13.5, outline: 'none' }}
+                    onFocus={e => e.target.style.borderColor = 'var(--c-ink)'}
+                    onBlur={e => e.target.style.borderColor = 'var(--c-border)'}
+                  />
+                  <button
+                    onClick={() => {
+                      if (!refInput.trim()) return
+                      setModal(m => ({ ...m, item: { ...m.item!, refs: [...(m.item!.refs || []), { label: refInput.trim() }] } }))
+                      setRefInput('')
+                    }}
+                    style={{ padding: '9px 16px', borderRadius: 10, background: 'var(--c-ink)', color: '#fff', fontSize: 13.5, fontWeight: 700, flexShrink: 0 }}>
+                    Add
+                  </button>
+                </div>
+                {(modal.item!.refs || []).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {(modal.item!.refs || []).map((r, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--c-fill)', border: '1px solid var(--c-border)', borderRadius: 20, padding: '4px 10px 4px 8px', fontSize: 12.5 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        <span style={{ color: 'var(--c-ink-2)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+                        <button onClick={() => setModal(m => ({ ...m, item: { ...m.item!, refs: (m.item!.refs || []).filter((_, j) => j !== i) } }))}
+                          style={{ color: 'var(--c-ghost)', display: 'flex', alignItems: 'center', lineHeight: 1, marginLeft: 2 }}>
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
