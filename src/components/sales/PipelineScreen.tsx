@@ -72,10 +72,10 @@ export default function PipelineScreen() {
       </div>
 
       {/* Owner filter */}
-      {state.users.length > 0 && (
+      {state.users.filter(u => u.role === 'sales').length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: '#fff', border: '1px solid var(--c-border)', borderRadius: 10, padding: '5px 8px', marginBottom: 18, width: 'fit-content' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-ghost)', letterSpacing: '.04em', paddingRight: 6 }}>OWNER</span>
-          {[{ id: '', label: 'All' }, ...state.users.map(u => ({ id: u.id, label: u.name.split(' ')[0] }))].map(o => (
+          {[{ id: '', label: 'All' }, ...state.users.filter(u => u.role === 'sales').map(u => ({ id: u.id, label: u.name.split(' ')[0] }))].map(o => (
             <button key={o.id} onClick={() => setFilterOwner(o.id)}
               style={{ padding: '4px 10px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, border: 'none', background: filterOwner === o.id ? 'var(--c-ink)' : 'transparent', color: filterOwner === o.id ? '#fff' : 'var(--c-subtle)', cursor: 'pointer', transition: 'all .12s' }}>
               {o.label}
