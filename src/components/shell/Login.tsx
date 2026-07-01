@@ -4,19 +4,56 @@ import { Sparkle, Spinner } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [pass, setPass] = useState('')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+  const [showPass, setShowPass] = useState(false)
   const sb = createClient()
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
-    setErr(''); setLoading(true)
+    setErr('')
+    setLoading(true)
+
+    const trimmed = identifier.trim()
+    let email = trimmed
+
+    // If it doesn't look like an email, look up by name
+    if (!trimmed.includes('@')) {
+      try {
+        const res = await fetch('/api/auth/lookup-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: trimmed }),
+        })
+        const data = await res.json()
+        if (data.email) {
+          email = data.email
+        } else {
+          setErr(`No account found for "${trimmed}". Ask your admin for your login email.`)
+          setLoading(false)
+          return
+        }
+      } catch {
+        setErr('Could not look up account. Please use your email address.')
+        setLoading(false)
+        return
+      }
+    }
+
     const { error } = await sb.auth.signInWithPassword({ email, password: pass })
-    if (error) setErr(error.message)
+    if (error) {
+      if (error.message.includes('Invalid login')) {
+        setErr('Wrong password — or account does not exist yet.')
+      } else {
+        setErr(error.message)
+      }
+    }
     setLoading(false)
   }
+
+  const isEmail = identifier.includes('@')
 
   return (
     <div style={{ display:'flex', height:'100vh', fontFamily:'var(--font-body)' }}>
@@ -51,32 +88,71 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right: sign-in only */}
+      {/* Right: sign-in */}
       <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:48, background:'#FAFBF9' }}>
         <div style={{ width:'100%', maxWidth:380, animation:'fadeUp .5s ease both' }}>
           <h2 style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:700, letterSpacing:'-0.02em', marginBottom:6 }}>Welcome back</h2>
           <p style={{ color:'var(--c-subtle)', fontSize:14.5, marginBottom:32 }}>Sign in to your workspace</p>
 
           <form onSubmit={handleSignIn}>
-            <label style={{ display:'block', fontSize:12.5, fontWeight:600, color:'var(--c-muted)', marginBottom:7 }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@agency.com"
-              style={{ width:'100%', background:'#fff', border:'1.5px solid var(--c-border)', borderRadius:12, padding:'13px 15px', fontSize:15, marginBottom:16, transition:'border-color .15s' }}
-              onFocus={e => (e.target as HTMLInputElement).style.borderColor='var(--c-ink)'}
-              onBlur={e => (e.target as HTMLInputElement).style.borderColor='var(--c-border)'} />
+            <div style={{ marginBottom:16 }}>
+              <label style={{ display:'block', fontSize:12.5, fontWeight:600, color:'var(--c-muted)', marginBottom:7 }}>
+                Name or email
+              </label>
+              <input
+                type="text"
+                value={identifier}
+                onChange={e => setIdentifier(e.target.value)}
+                required
+                placeholder="Riya or riya@agency.com"
+                autoComplete="username"
+                style={{ width:'100%', background:'#fff', border:'1.5px solid var(--c-border)', borderRadius:12, padding:'13px 15px', fontSize:15, transition:'border-color .15s' }}
+                onFocus={e => (e.target as HTMLInputElement).style.borderColor='var(--c-ink)'}
+                onBlur={e => (e.target as HTMLInputElement).style.borderColor='var(--c-border)'}
+              />
+              {identifier && !isEmail && (
+                <div style={{ fontSize:12, color:'var(--c-faint)', marginTop:5, display:'flex', alignItems:'center', gap:5 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                  Will look up your email by name
+                </div>
+              )}
+            </div>
 
-            <label style={{ display:'block', fontSize:12.5, fontWeight:600, color:'var(--c-muted)', marginBottom:7 }}>Password</label>
-            <input type="password" value={pass} onChange={e => setPass(e.target.value)} required placeholder="••••••••"
-              style={{ width:'100%', background:'#fff', border:'1.5px solid var(--c-border)', borderRadius:12, padding:'13px 15px', fontSize:15, marginBottom: err ? 10 : 24, transition:'border-color .15s' }}
-              onFocus={e => (e.target as HTMLInputElement).style.borderColor='var(--c-ink)'}
-              onBlur={e => (e.target as HTMLInputElement).style.borderColor='var(--c-border)'} />
+            <div style={{ marginBottom: err ? 10 : 24 }}>
+              <label style={{ display:'block', fontSize:12.5, fontWeight:600, color:'var(--c-muted)', marginBottom:7 }}>Password</label>
+              <div style={{ position:'relative' }}>
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  value={pass}
+                  onChange={e => setPass(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  style={{ width:'100%', background:'#fff', border:'1.5px solid var(--c-border)', borderRadius:12, padding:'13px 44px 13px 15px', fontSize:15, transition:'border-color .15s' }}
+                  onFocus={e => (e.target as HTMLInputElement).style.borderColor='var(--c-ink)'}
+                  onBlur={e => (e.target as HTMLInputElement).style.borderColor='var(--c-border)'}
+                />
+                <button type="button" onClick={() => setShowPass(v => !v)}
+                  style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', color:'var(--c-ghost)', background:'none', fontSize:12, fontWeight:600 }}>
+                  {showPass ? 'hide' : 'show'}
+                </button>
+              </div>
+            </div>
 
-            {err && <div style={{ color:'#DC2626', fontSize:13, fontWeight:500, marginBottom:14, background:'#FEE2E2', borderRadius:9, padding:'9px 12px' }}>{err}</div>}
+            {err && (
+              <div style={{ color:'#DC2626', fontSize:13, fontWeight:500, marginBottom:14, background:'#FEE2E2', borderRadius:9, padding:'9px 12px', lineHeight:1.5 }}>
+                {err}
+              </div>
+            )}
 
             <button type="submit" disabled={loading}
               style={{ width:'100%', background:'var(--c-ink)', color:'#fff', borderRadius:12, padding:'14px', fontWeight:700, fontSize:15.5, display:'flex', alignItems:'center', justifyContent:'center', gap:9, transition:'transform .15s, opacity .15s', opacity: loading ? .7 : 1 }}
               onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLElement).style.transform='translateY(-2px)' }}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform=''}>
-              {loading ? <><Spinner size={16} color="#fff" />Signing in…</> : <>Sign in <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></>}
+              {loading
+                ? <><Spinner size={16} color="#fff" />{identifier.includes('@') ? 'Signing in…' : 'Looking up account…'}</>
+                : <>Sign in <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></>
+              }
             </button>
           </form>
 

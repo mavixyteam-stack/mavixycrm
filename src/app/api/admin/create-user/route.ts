@@ -18,6 +18,10 @@ async function getCallerRole(): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not set on this server. Add it to your Vercel environment variables.' }, { status: 500 })
+  }
+
   const callerRole = await getCallerRole()
   if (callerRole !== 'owner') {
     return NextResponse.json({ error: 'Only owners can create accounts' }, { status: 403 })
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
   )
 
   const { data, error } = await admin.auth.admin.createUser({

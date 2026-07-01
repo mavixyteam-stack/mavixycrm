@@ -17,6 +17,10 @@ async function getCallerAndRole(): Promise<{ callerId: string | null; role: stri
 }
 
 export async function POST(req: NextRequest) {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not set. Add it to your Vercel environment variables.' }, { status: 500 })
+  }
+
   const { callerId, role } = await getCallerAndRole()
   if (role !== 'owner') {
     return NextResponse.json({ error: 'Only owners can delete accounts' }, { status: 403 })
@@ -28,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
   )
 
   const { error } = await admin.auth.admin.deleteUser(user_id)
