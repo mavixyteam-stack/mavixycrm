@@ -1,0 +1,38 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
+
+async function getCallerAndRole(): Promise<{ callerId: string | null; role: string | null }> {
+  const cookieStore = await cookies()
+  const sb = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return { callerId: null, role: null }
+  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
+  return { callerId: user.id, role: profile?.role || null }
+}
+
+export async function POST(req: NextRequest) {
+  const { callerId, role } = await getCallerAndRole()
+  if (role !== 'owner') {
+    return NextResponse.json({ error: 'Only owners can delete accounts' }, { status: 403 })
+  }
+
+  const { user_id } = await req.json()
+  if (!user_id) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
+  if (user_id === callerId) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
+
+  const admin = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const { error } = await admin.auth.admin.deleteUser(user_id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  return NextResponse.json({ ok: true })
+}

@@ -50,20 +50,28 @@ function formatMs(ms: number) {
   return h >= 1 ? `${h.toFixed(1)}h` : `${Math.round(ms / 60000)}m`
 }
 
+const inputStyle: React.CSSProperties = {
+  width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10,
+  padding: '10px 12px', fontSize: 14, outline: 'none', transition: 'border-color .15s',
+}
+
 export default function TeamScreen() {
   const { state, dispatch } = useApp()
   const toast = useToast()
   const [filter, setFilter] = useState('All')
   const [addOpen, setAddOpen] = useState(false)
   const [editUser, setEditUser] = useState<Profile | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
+
   const [form, setForm] = useState({ name:'', email:'', title:'', role:'employee' as 'manager'|'sales'|'employee', color:'#0EA5A4', password:'' })
-  const [editForm, setEditForm] = useState({ title:'', role:'employee', color:'' })
+  const [editForm, setEditForm] = useState({ name:'', title:'', role:'employee', color:'', new_password:'', showPass: false })
   const [saving, setSaving] = useState(false)
-  const [showPass, setShowPass] = useState(false)
+  const [showAddPass, setShowAddPass] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   const isOwner = state.currentUser?.role === 'owner'
   const today = new Date().toISOString().split('T')[0]
 
-  // Build dept filter list from actual team
   const allDepts = Array.from(new Set(state.users.map(getDept)))
   const depts = ['All', ...allDepts]
   const deptCounts: Record<string,number> = { All: state.users.length }
@@ -123,22 +131,54 @@ export default function TeamScreen() {
     setSaving(false)
   }
 
-  function removeUser(id: string) {
-    if (id === state.currentUser?.id) { toast('Cannot remove yourself'); return }
-    dispatch({ type: 'DELETE_USER', id })
-    toast('Removed from local view — delete in Supabase to fully revoke access')
-  }
-
   function openEdit(u: Profile) {
     setEditUser(u)
-    setEditForm({ title: u.title || '', role: u.role, color: u.color })
+    setEditForm({ name: u.name, title: u.title || '', role: u.role, color: u.color, new_password: '', showPass: false })
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editUser) return
-    dispatch({ type: 'UPSERT_USER', user: { ...editUser, title: editForm.title, role: editForm.role as any, color: editForm.color } })
-    toast('Profile updated')
-    setEditUser(null)
+    if (!editForm.name.trim()) { toast('Name is required'); return }
+    if (editForm.new_password && editForm.new_password.length < 6) { toast('Password must be at least 6 chars'); return }
+    setSaving(true)
+    try {
+      const body: Record<string, string> = {
+        user_id: editUser.id,
+        name: editForm.name.trim(),
+        title: editForm.title,
+        role: editForm.role,
+        color: editForm.color,
+      }
+      if (editForm.new_password) body.new_password = editForm.new_password
+      const res = await fetch('/api/admin/update-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast(`Error: ${data.error}`); setSaving(false); return }
+      const initials = editForm.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+      dispatch({ type: 'UPSERT_USER', user: { ...editUser, name: editForm.name.trim(), initials, title: editForm.title, role: editForm.role as any, color: editForm.color } })
+      toast(editForm.new_password ? 'Profile updated & password reset' : 'Profile updated')
+      setEditUser(null)
+    } catch { toast('Failed to save changes') }
+    setSaving(false)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: deleteTarget.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast(`Error: ${data.error}`); setDeleting(false); return }
+      dispatch({ type: 'DELETE_USER', id: deleteTarget.id })
+      toast(`${deleteTarget.name} removed`)
+      setDeleteTarget(null)
+    } catch { toast('Failed to remove user') }
+    setDeleting(false)
   }
 
   return (
@@ -192,18 +232,14 @@ export default function TeamScreen() {
               onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,.09)'; e.currentTarget.style.borderColor = isMe ? 'var(--c-accent)' : 'var(--c-rule)' }}
               onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = isMe ? 'var(--c-accent)' : 'var(--c-border)' }}>
 
-              {/* Top row: avatar + name/title + role chip + edit */}
+              {/* Top row */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <div style={{ width: 52, height: 52, borderRadius: 15, background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>
                     {u.initials}
                   </div>
-                  {att.status === 'active' && (
-                    <div style={{ position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: '50%', background: '#10B981', border: '2px solid #fff' }} />
-                  )}
-                  {att.status === 'break' && (
-                    <div style={{ position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: '50%', background: '#F59E0B', border: '2px solid #fff' }} />
-                  )}
+                  {att.status === 'active' && <div style={{ position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: '50%', background: '#10B981', border: '2px solid #fff' }} />}
+                  {att.status === 'break' && <div style={{ position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: '50%', background: '#F59E0B', border: '2px solid #fff' }} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
@@ -212,15 +248,27 @@ export default function TeamScreen() {
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--c-faint)' }}>{u.title || u.email}</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: rc.c, background: rc.bg, borderRadius: 7, padding: '4px 9px', textTransform: 'capitalize' }}>{u.role}</span>
                   {isOwner && (
-                    <button onClick={() => openEdit(u)}
-                      style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-ghost)', transition: 'background .12s, color .12s' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--c-fill)'; e.currentTarget.style.color = 'var(--c-muted)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--c-ghost)' }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
+                    <>
+                      <button onClick={() => openEdit(u)}
+                        title="Edit member"
+                        style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-ghost)', transition: 'background .12s, color .12s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--c-fill)'; e.currentTarget.style.color = 'var(--c-muted)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--c-ghost)' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                      {!isMe && (
+                        <button onClick={() => setDeleteTarget(u)}
+                          title="Remove member"
+                          style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-ghost)', transition: 'background .12s, color .12s' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#EF4444' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--c-ghost)' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -232,66 +280,34 @@ export default function TeamScreen() {
                   <span style={{ fontSize: 13, fontWeight: 700, color: pct > 100 ? '#EF4444' : pct > 80 ? '#F59E0B' : 'var(--c-ink-2)' }}>{pct}%</span>
                 </div>
                 <div style={{ height: 6, background: 'var(--c-fill)', borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, background: barColor(pct), width: `${barW}%`, animation: 'progressFill .7s ease both', transition: 'width .4s ease' }} />
+                  <div style={{ height: '100%', borderRadius: 99, background: barColor(pct), width: `${barW}%`, transition: 'width .4s ease' }} />
                 </div>
               </div>
 
-              {/* Status label */}
               <div style={{ fontSize: 13, fontWeight: 700, color: cap.color, marginBottom: 14 }}>{cap.label}</div>
-
-              {/* Divider */}
               <div style={{ height: 1, background: 'var(--c-border-soft)', marginBottom: 14 }} />
 
               {/* Attendance row */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  {att.status === 'active' && <>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#10B981' }}>Active now</span>
-                  </>}
-                  {att.status === 'break' && <>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#F59E0B' }}>On break</span>
-                  </>}
-                  {att.status === 'out' && <>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--c-ghost)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: 'var(--c-muted)' }}>Checked out</span>
-                  </>}
-                  {att.status === 'notchecked' && <>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--c-border)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: 'var(--c-ghost)' }}>Not checked in</span>
-                  </>}
+                  {att.status === 'active' && <><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', flexShrink: 0 }} /><span style={{ fontSize: 13, fontWeight: 600, color: '#10B981' }}>Active now</span></>}
+                  {att.status === 'break' && <><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} /><span style={{ fontSize: 13, fontWeight: 600, color: '#F59E0B' }}>On break</span></>}
+                  {att.status === 'out' && <><div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--c-ghost)', flexShrink: 0 }} /><span style={{ fontSize: 13, color: 'var(--c-muted)' }}>Checked out</span></>}
+                  {att.status === 'notchecked' && <><div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--c-border)', flexShrink: 0 }} /><span style={{ fontSize: 13, color: 'var(--c-ghost)' }}>Not checked in</span></>}
                 </div>
-                {att.ms > 0 && (
-                  <span style={{ fontSize: 13, color: 'var(--c-faint)' }}>{formatMs(att.ms)} today</span>
-                )}
-                {att.status === 'notchecked' && (
-                  <span style={{ fontSize: 13, color: 'var(--c-ghost)' }}>—</span>
-                )}
+                {att.ms > 0 && <span style={{ fontSize: 13, color: 'var(--c-faint)' }}>{formatMs(att.ms)} today</span>}
+                {att.status === 'notchecked' && <span style={{ fontSize: 13, color: 'var(--c-ghost)' }}>—</span>}
               </div>
 
-              {/* Email */}
               {u.email && (
-                <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--c-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {u.email}
-                </div>
-              )}
-
-              {/* Remove button */}
-              {isOwner && !isMe && (
-                <button onClick={() => removeUser(u.id)}
-                  style={{ position: 'absolute', top: 14, right: 56, width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-ghost)', transition: 'background .15s, color .15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.background='#FEF2F2'; e.currentTarget.style.color='#EF4444' }}
-                  onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--c-ghost)' }}>
-                  <X size={11} />
-                </button>
+                <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--c-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
               )}
             </div>
           )
         })}
       </div>
 
-      {/* Add Member modal */}
+      {/* ── Add Member modal ─────────────────────────────────────────────────── */}
       {addOpen && (
         <div onClick={() => setAddOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
@@ -308,31 +324,32 @@ export default function TeamScreen() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Full Name *</label>
-                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Aanya Mehra"
-                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }} />
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Aanya Mehra" style={inputStyle}
+                    onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Job Title</label>
-                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Designer"
-                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }} />
+                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Designer" style={inputStyle}
+                    onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
                 </div>
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Work Email *</label>
-                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="aanya@agency.com"
-                  style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }} />
+                <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="aanya@agency.com" style={inputStyle}
+                  onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Temporary Password *</label>
                 <div style={{ position: 'relative' }}>
-                  <input type={showPass ? 'text' : 'password'} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 6 characters"
-                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 40px 10px 12px', fontSize: 14 }} />
-                  <button onClick={() => setShowPass(!showPass)} type="button"
-                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-ghost)', background: 'none', fontSize: 12, fontWeight: 600 }}>
-                    {showPass ? 'hide' : 'show'}
+                  <input type={showAddPass ? 'text' : 'password'} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 6 characters"
+                    style={{ ...inputStyle, paddingRight: 46 }}
+                    onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
+                  <button onClick={() => setShowAddPass(!showAddPass)} type="button"
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-ghost)', background: 'none', fontSize: 12, fontWeight: 600 }}>
+                    {showAddPass ? 'hide' : 'show'}
                   </button>
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 4 }}>Share this with them — they should change it after first login</div>
+                <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 4 }}>Share this with them — they can change it after logging in</div>
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 8 }}>Access Role</label>
@@ -344,7 +361,7 @@ export default function TeamScreen() {
                         {form.role === r.key && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
                       </div>
                       <div>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: form.role === r.key ? 'var(--c-accent)' : 'var(--c-ink)', textTransform: 'capitalize' }}>{r.label}</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: form.role === r.key ? 'var(--c-accent)' : 'var(--c-ink)' }}>{r.label}</div>
                         <div style={{ fontSize: 12, color: 'var(--c-subtle)' }}>{r.desc}</div>
                       </div>
                     </button>
@@ -372,15 +389,15 @@ export default function TeamScreen() {
         </div>
       )}
 
-      {/* Edit member modal */}
+      {/* ── Edit Member modal ────────────────────────────────────────────────── */}
       {editUser && (
         <div onClick={() => setEditUser(null)} className="modal-overlay">
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 11, background: editForm.color || editUser.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>{editUser.initials}</div>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: editForm.color || editUser.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>{editUser.initials}</div>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>{editUser.name}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>Edit Member</div>
                   <div style={{ fontSize: 12.5, color: 'var(--c-faint)' }}>{editUser.email}</div>
                 </div>
               </div>
@@ -388,14 +405,29 @@ export default function TeamScreen() {
                 <X size={14} color="var(--c-ghost)" />
               </button>
             </div>
-            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Job Title</label>
-                <input value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
-                  style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }}
-                  onFocus={e => e.target.style.borderColor = 'var(--c-ink)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--c-border)'} />
+
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '65vh', overflowY: 'auto' }}>
+              {/* Name + Title */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Full Name *</label>
+                  <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={inputStyle}
+                    onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Job Title</label>
+                  <input value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Designer" style={inputStyle}
+                    onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
+                </div>
               </div>
+
+              {/* Email (read-only) */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Email (cannot change)</label>
+                <input readOnly value={editUser.email} style={{ ...inputStyle, background: 'var(--c-fill)', color: 'var(--c-faint)', cursor: 'default' }} />
+              </div>
+
+              {/* Role */}
               {editUser.role !== 'owner' && (
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 8 }}>Role</label>
@@ -407,21 +439,92 @@ export default function TeamScreen() {
                       </button>
                     ))}
                   </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 5 }}>
+                    {ROLE_OPTS.find(r => r.key === editForm.role)?.desc}
+                  </div>
                 </div>
               )}
+
+              {/* Avatar color */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 7 }}>Avatar Color</label>
                 <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                   {COLORS.map(c => (
                     <button key={c} onClick={() => setEditForm(f => ({ ...f, color: c }))}
-                      style={{ width: 28, height: 28, borderRadius: 8, background: c, border: `2.5px solid ${editForm.color === c ? 'var(--c-ink)' : 'transparent'}`, transition: 'border-color .12s' }} />
+                      style={{ width: 30, height: 30, borderRadius: 9, background: c, border: `2.5px solid ${editForm.color === c ? 'var(--c-ink)' : 'transparent'}`, transition: 'border-color .12s' }} />
                   ))}
                 </div>
               </div>
+
+              {/* Reset password */}
+              <div style={{ paddingTop: 4, borderTop: '1px solid var(--c-border-soft)' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>
+                  Reset Password
+                  <span style={{ fontWeight: 400, marginLeft: 6 }}>(leave blank to keep current)</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input type={editForm.showPass ? 'text' : 'password'} value={editForm.new_password}
+                    onChange={e => setEditForm(f => ({ ...f, new_password: e.target.value }))}
+                    placeholder="New password (min 6 chars)"
+                    style={{ ...inputStyle, paddingRight: 46 }}
+                    onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
+                  <button onClick={() => setEditForm(f => ({ ...f, showPass: !f.showPass }))} type="button"
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-ghost)', background: 'none', fontSize: 12, fontWeight: 600 }}>
+                    {editForm.showPass ? 'hide' : 'show'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Danger zone — delete */}
+              {editUser.id !== state.currentUser?.id && (
+                <div style={{ padding: '14px', borderRadius: 12, border: '1.5px solid #FEE2E2', background: '#FFF9F9' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#EF4444', marginBottom: 6 }}>Danger zone</div>
+                  <div style={{ fontSize: 12.5, color: '#9CA3AF', marginBottom: 10 }}>
+                    Permanently removes this user and revokes all access. This cannot be undone.
+                  </div>
+                  <button
+                    onClick={() => { setEditUser(null); setDeleteTarget(editUser) }}
+                    style={{ padding: '8px 14px', borderRadius: 9, background: '#FEE2E2', color: '#EF4444', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                    Remove {editUser.name.split(' ')[0]}
+                  </button>
+                </div>
+              )}
             </div>
+
             <div style={{ padding: '16px 24px', borderTop: '1px solid var(--c-border-soft)', display: 'flex', gap: 10 }}>
               <button onClick={() => setEditUser(null)} style={{ flex: 1, padding: '11px', borderRadius: 11, border: '1.5px solid var(--c-border)', fontSize: 14, fontWeight: 600, color: 'var(--c-subtle)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={saveEdit} style={{ flex: 2, padding: '11px', borderRadius: 11, background: 'var(--c-ink)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Save changes</button>
+              <button onClick={saveEdit} disabled={saving}
+                style={{ flex: 2, padding: '11px', borderRadius: 11, background: 'var(--c-ink)', color: '#fff', fontSize: 14, fontWeight: 700, opacity: saving ? .7 : 1, cursor: 'pointer' }}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirmation modal ────────────────────────────────────────── */}
+      {deleteTarget && (
+        <div onClick={() => !deleting && setDeleteTarget(null)} className="modal-overlay">
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .2s cubic-bezier(.2,.9,.3,1) both', padding: '28px 24px' }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, marginBottom: 8 }}>
+              Remove {deleteTarget.name}?
+            </div>
+            <div style={{ fontSize: 13.5, color: 'var(--c-subtle)', lineHeight: 1.55, marginBottom: 24 }}>
+              This will permanently delete their account and revoke all access. Their tasks and content assignments will remain but become unassigned.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                style={{ flex: 1, padding: '11px', borderRadius: 11, border: '1.5px solid var(--c-border)', fontSize: 14, fontWeight: 600, color: 'var(--c-subtle)', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={confirmDelete} disabled={deleting}
+                style={{ flex: 1, padding: '11px', borderRadius: 11, background: '#EF4444', color: '#fff', fontSize: 14, fontWeight: 700, opacity: deleting ? .7 : 1, cursor: 'pointer' }}>
+                {deleting ? 'Removing…' : 'Yes, remove'}
+              </button>
             </div>
           </div>
         </div>
