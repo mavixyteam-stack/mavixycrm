@@ -132,6 +132,16 @@ export async function dbUpsertDeal(deal: Deal) {
     stage: deal.stage,
     probability: deal.probability,
     owner_id: deal.owner_id || null,
+    email: deal.email || null,
+    phone: deal.phone || null,
+    source: deal.source || null,
+    service: deal.service || null,
+    budget_text: deal.budget_text || null,
+    score: deal.score || null,
+    lead_status: deal.lead_status || null,
+    notes: deal.notes || null,
+    initials: deal.initials || null,
+    color: deal.color || null,
   })
   if (error) console.error('upsertDeal', error)
 }

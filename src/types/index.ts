@@ -119,6 +119,17 @@ export interface Deal {
   probability: number
   owner_id: string
   created_at: string
+  // Lead-specific fields (populated when stage starts as 'lead')
+  email?: string
+  phone?: string
+  source?: string
+  service?: string
+  budget_text?: string
+  score?: 'hot' | 'warm' | 'cold'
+  lead_status?: 'new' | 'contacted' | 'qualified'
+  notes?: string
+  initials?: string
+  color?: string
 }
 
 export interface Notification {

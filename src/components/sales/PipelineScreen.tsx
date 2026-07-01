@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useApp, useToast } from '@/lib/store'
+import { useApp, useToast, useUpsertDeal } from '@/lib/store'
 import { Plus, X, Check } from '@/components/ui/Icon'
 
 const STAGES = [
@@ -11,51 +11,45 @@ const STAGES = [
   { key: 'closed', label: 'Closed Won', color: '#0E8C63', bg: '#E7FAF3' },
 ] as const
 
-const SEED_DEALS = [
-  { id: 'd1', name: 'Full retainer — social + ads', company: 'Brew Republic', value: 85000, stage: 'qualified' as const, probability: 60, owner_id: 'dev', created_at: '' },
-  { id: 'd2', name: 'SEO + blog package', company: 'Bloom & Co', value: 32000, stage: 'proposal' as const, probability: 75, owner_id: 'ira', created_at: '' },
-  { id: 'd3', name: 'Social media management', company: 'Orbit Eats', value: 45000, stage: 'negotiation' as const, probability: 85, owner_id: 'dev', created_at: '' },
-  { id: 'd4', name: 'Performance ads Q3', company: 'NexGen Wear', value: 60000, stage: 'lead' as const, probability: 25, owner_id: 'ira', created_at: '' },
-  { id: 'd5', name: '6-month content plan', company: 'Casa Verde', value: 120000, stage: 'closed' as const, probability: 100, owner_id: 'dev', created_at: '' },
-]
-
 export default function PipelineScreen() {
-  const { state, dispatch } = useApp()
+  const { state } = useApp()
   const toast = useToast()
+  const upsertDeal = useUpsertDeal()
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', company: '', value: '', stage: 'lead' as typeof STAGES[number]['key'], probability: 30 })
+  const [filterOwner, setFilterOwner] = useState('')
+  const [form, setForm] = useState({ name: '', company: '', value: '', stage: 'lead' as typeof STAGES[number]['key'], probability: 30, owner_id: state.currentUser?.id || '' })
 
-  const deals = state.deals.length > 0 ? state.deals : SEED_DEALS
+  const allDeals = state.deals
+  const deals = filterOwner ? allDeals.filter(d => d.owner_id === filterOwner) : allDeals
 
-  const totalPipeline = deals.filter(d => d.stage !== 'closed').reduce((s, d) => s + d.value, 0)
-  const weighted = deals.filter(d => d.stage !== 'closed').reduce((s, d) => s + d.value * (d.probability / 100), 0)
-  const closed = deals.filter(d => d.stage === 'closed').reduce((s, d) => s + d.value, 0)
+  const totalPipeline = allDeals.filter(d => d.stage !== 'closed').reduce((s, d) => s + d.value, 0)
+  const weighted = allDeals.filter(d => d.stage !== 'closed').reduce((s, d) => s + d.value * (d.probability / 100), 0)
+  const closed = allDeals.filter(d => d.stage === 'closed').reduce((s, d) => s + d.value, 0)
 
   function moveStage(id: string, stage: typeof STAGES[number]['key']) {
-    const deal = deals.find(d => d.id === id)
+    const deal = allDeals.find(d => d.id === id)
     if (!deal) return
-    dispatch({ type: 'UPSERT_DEAL', deal: { ...deal, stage } })
+    upsertDeal({ ...deal, stage })
     toast(`Moved to ${STAGES.find(s => s.key === stage)?.label}`)
   }
 
   function addDeal() {
     if (!form.name.trim() || !form.company.trim()) return
-    const deal = {
+    upsertDeal({
       id: crypto.randomUUID(),
       name: form.name,
       company: form.company,
       value: Number(form.value) || 0,
       stage: form.stage,
       probability: form.probability,
-      owner_id: state.currentUser?.id || '',
+      owner_id: form.owner_id || state.currentUser?.id || '',
       created_at: new Date().toISOString(),
-    }
-    dispatch({ type: 'UPSERT_DEAL', deal })
+    })
     toast('Deal added')
     setAddOpen(false)
-    setForm({ name: '', company: '', value: '', stage: 'lead', probability: 30 })
+    setForm({ name: '', company: '', value: '', stage: 'lead', probability: 30, owner_id: state.currentUser?.id || '' })
   }
 
   function fmtCurrency(n: number) {
@@ -72,10 +66,23 @@ export default function PipelineScreen() {
           <p style={{ fontSize: 14, color: 'var(--c-subtle)' }}>Drag deals between stages to update status</p>
         </div>
         <button onClick={() => setAddOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--c-ink)', color: '#fff', borderRadius: 10, padding: '9px 16px', fontWeight: 600, fontSize: 13 }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--c-ink)', color: '#fff', borderRadius: 10, padding: '9px 16px', fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer' }}>
           <Plus size={13} />Add Deal
         </button>
       </div>
+
+      {/* Owner filter */}
+      {state.users.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: '#fff', border: '1px solid var(--c-border)', borderRadius: 10, padding: '5px 8px', marginBottom: 18, width: 'fit-content' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-ghost)', letterSpacing: '.04em', paddingRight: 6 }}>OWNER</span>
+          {[{ id: '', label: 'All' }, ...state.users.map(u => ({ id: u.id, label: u.name.split(' ')[0] }))].map(o => (
+            <button key={o.id} onClick={() => setFilterOwner(o.id)}
+              style={{ padding: '4px 10px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, border: 'none', background: filterOwner === o.id ? 'var(--c-ink)' : 'transparent', color: filterOwner === o.id ? '#fff' : 'var(--c-subtle)', cursor: 'pointer', transition: 'all .12s' }}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
@@ -115,6 +122,9 @@ export default function PipelineScreen() {
                 </div>
               )}
 
+              {stageDeals.length === 0 && (
+                <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--c-ghost)', fontSize: 12 }}>Empty</div>
+              )}
               {stageDeals.map(deal => {
                 const owner = state.users.find(u => u.id === deal.owner_id)
                 return (
@@ -177,6 +187,16 @@ export default function PipelineScreen() {
                     style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }} />
                 </div>
               </div>
+              {state.users.length > 0 && (
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Assign to</label>
+                  <select value={form.owner_id} onChange={e => setForm(f => ({ ...f, owner_id: e.target.value }))}
+                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: 'var(--c-fill)', cursor: 'pointer' }}>
+                    <option value="">Unassigned</option>
+                    {state.users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Stage</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
