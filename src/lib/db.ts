@@ -48,7 +48,7 @@ export async function dbUpsertPlanItem(item: PlanItem) {
     day: item.day,
     status: item.status,
   })
-  if (error) console.error('upsertPlanItem', error)
+  if (error) { console.error('upsertPlanItem', error); throw error }
 }
 
 export async function dbDeletePlanItem(id: string) {
@@ -60,7 +60,7 @@ export async function dbDeletePlanItem(id: string) {
 
 export async function dbUpsertClient(client: Client) {
   const sb = createClient()
-  const { error } = await sb.from('clients').upsert({
+  const payload: Record<string, unknown> = {
     id: client.id,
     name: client.name,
     initials: client.initials,
@@ -80,9 +80,14 @@ export async function dbUpsertClient(client: Client) {
     target_audience: client.target_audience,
     brand_voice: client.brand_voice,
     reference_links: client.reference_links,
-    connections: client.connections || {},
-  })
-  if (error) console.error('upsertClient', error)
+  }
+  // connections column may not exist if migration hasn't been run yet — try with, fall back without
+  const { error } = await sb.from('clients').upsert({ ...payload, connections: client.connections || {} })
+  if (error) {
+    console.warn('upsertClient with connections failed, retrying without:', error.message)
+    const { error: error2 } = await sb.from('clients').upsert(payload)
+    if (error2) { console.error('upsertClient', error2); throw error2 }
+  }
 }
 
 export async function dbDeleteClient(id: string) {

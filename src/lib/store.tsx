@@ -230,12 +230,23 @@ export function useToast() {
 
 // ── Supabase-synced mutation hooks ────────────────────────────────────────────
 
+function useDbErrorToast() {
+  const { dispatch } = useApp()
+  return useCallback((label: string, err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(label, err)
+    dispatch({ type: 'SHOW_TOAST', msg: `Save failed: ${msg.slice(0, 80)}` })
+    setTimeout(() => dispatch({ type: 'CLEAR_TOAST' }), 5000)
+  }, [dispatch])
+}
+
 export function useUpsertPlanItem() {
   const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
   return useCallback(async (item: PlanItem) => {
     dispatch({ type: 'UPSERT_PLAN_ITEM', item })
-    await dbUpsertPlanItem(item)
-  }, [dispatch])
+    try { await dbUpsertPlanItem(item) } catch (e) { errToast('upsertPlanItem', e) }
+  }, [dispatch, errToast])
 }
 
 export function useDeletePlanItem() {
@@ -256,18 +267,20 @@ export function useDeleteClient() {
 
 export function useUpsertClient() {
   const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
   return useCallback(async (client: Client) => {
     dispatch({ type: 'UPSERT_CLIENT', client })
-    await dbUpsertClient(client)
-  }, [dispatch])
+    try { await dbUpsertClient(client) } catch (e) { errToast('upsertClient', e) }
+  }, [dispatch, errToast])
 }
 
 export function useUpsertTask() {
   const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
   return useCallback(async (task: Task) => {
     dispatch({ type: 'UPSERT_TASK', task })
-    await dbUpsertTask(task)
-  }, [dispatch])
+    try { await dbUpsertTask(task) } catch (e) { errToast('upsertTask', e) }
+  }, [dispatch, errToast])
 }
 
 export function useUpsertDeal() {
