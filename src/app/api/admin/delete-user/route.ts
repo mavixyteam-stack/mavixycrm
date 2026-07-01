@@ -38,9 +38,15 @@ export async function POST(req: NextRequest) {
   // Try to delete from Supabase Auth
   const { error: authError } = await admin.auth.admin.deleteUser(user_id)
 
-  // If auth user doesn't exist (ghost profile — created before service key was configured),
-  // fall through and just delete the profile row so it disappears from the UI.
-  if (authError && !authError.message.toLowerCase().includes('not found') && !authError.message.toLowerCase().includes('user not found')) {
+  // Ghost profiles (created before service key was configured) don't exist in auth.users.
+  // Supabase returns "not found" OR "Database error deleting user" for missing users.
+  // Either way, fall through and clean up the profile row.
+  const isGhostError = authError && (
+    authError.message.toLowerCase().includes('not found') ||
+    authError.message.toLowerCase().includes('user not found') ||
+    authError.message.toLowerCase().includes('database error')
+  )
+  if (authError && !isGhostError) {
     return NextResponse.json({ error: authError.message }, { status: 400 })
   }
 
