@@ -7,6 +7,7 @@ import type { Profile } from '@/types'
 const CAPACITY_MAX = 8
 const COLORS = ['#0EA5A4','#FB7185','#6366F1','#F4B740','#8B5CF6','#2563EB','#10B981','#EF4444','#FF5C1F']
 const ROLE_OPTS = [
+  { key: 'owner',   label: 'Owner',   desc: 'Co-founder — full access to everything' },
   { key: 'manager', label: 'Manager', desc: 'Full access except owner settings' },
   { key: 'sales',   label: 'Sales',   desc: 'Pipeline, leads, clients only' },
   { key: 'employee',label: 'Employee',desc: 'Work tools: tasks, content, calendar' },
@@ -63,7 +64,7 @@ export default function TeamScreen() {
   const [editUser, setEditUser] = useState<Profile | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
 
-  const [form, setForm] = useState({ name:'', email:'', title:'', role:'employee' as 'manager'|'sales'|'employee', color:'#0EA5A4', password:'' })
+  const [form, setForm] = useState({ name:'', email:'', title:'', role:'employee' as 'owner'|'manager'|'sales'|'employee', color:'#0EA5A4', password:'' })
   const [editForm, setEditForm] = useState({ name:'', title:'', role:'employee', color:'', new_password:'', showPass: false })
   const [saving, setSaving] = useState(false)
   const [showAddPass, setShowAddPass] = useState(false)
@@ -428,13 +429,13 @@ export default function TeamScreen() {
               </div>
 
               {/* Role */}
-              {editUser.role !== 'owner' && (
+              {editUser.id !== state.currentUser?.id && (
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 8 }}>Role</label>
-                  <div style={{ display: 'flex', gap: 7 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
                     {ROLE_OPTS.map(r => (
                       <button key={r.key} onClick={() => setEditForm(f => ({ ...f, role: r.key }))}
-                        style={{ flex: 1, padding: '9px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: `1.5px solid ${editForm.role === r.key ? 'var(--c-accent)' : 'var(--c-border)'}`, color: editForm.role === r.key ? 'var(--c-accent)' : 'var(--c-muted)', background: editForm.role === r.key ? 'rgba(255,92,31,.06)' : '#fff', cursor: 'pointer', transition: 'all .12s' }}>
+                        style={{ padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 700, border: `1.5px solid ${editForm.role === r.key ? 'var(--c-accent)' : 'var(--c-border)'}`, color: editForm.role === r.key ? 'var(--c-accent)' : 'var(--c-muted)', background: editForm.role === r.key ? 'rgba(255,92,31,.06)' : '#fff', cursor: 'pointer', transition: 'all .12s', textAlign: 'left' }}>
                         {r.label}
                       </button>
                     ))}
