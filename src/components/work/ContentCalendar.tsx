@@ -399,12 +399,19 @@ export default function ContentCalendar() {
                   <>
                     <div style={{ fontSize:10.5, fontWeight:700, color:'var(--c-ghost)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:9 }}>Inspiration</div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
-                      {detailItem.refs.map((r, i) => (
-                        <span key={i} style={{ display:'inline-flex', alignItems:'center', gap:7, background:'var(--c-fill-soft)', border:'1px solid var(--c-border)', borderRadius:9, padding:'7px 12px', fontSize:13, fontWeight:600, color:'var(--c-ink-3)' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF5C1F" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
-                          {r.label}
-                        </span>
-                      ))}
+                      {detailItem.refs.map((r, i) => {
+                        const isUrl = /^https?:\/\//i.test(r.label)
+                        const Tag = isUrl ? 'a' : 'span'
+                        return (
+                          <Tag key={i} {...(isUrl ? { href: r.label, target: '_blank', rel: 'noopener noreferrer' } : {})}
+                            style={{ display:'inline-flex', alignItems:'center', gap:7, background:'var(--c-fill-soft)', border:'1px solid var(--c-border)', borderRadius:9, padding:'7px 12px', fontSize:13, fontWeight:600, color: isUrl ? '#2563EB' : 'var(--c-ink-3)', textDecoration:'none', cursor: isUrl ? 'pointer' : 'default', transition:'background .12s' }}
+                            onMouseEnter={isUrl ? (e => (e.currentTarget as HTMLElement).style.background = '#EFF6FF') : undefined}
+                            onMouseLeave={isUrl ? (e => (e.currentTarget as HTMLElement).style.background = 'var(--c-fill-soft)') : undefined}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={isUrl ? '#2563EB' : '#FF5C1F'} strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+                            {r.label}
+                          </Tag>
+                        )
+                      })}
                     </div>
                   </>
                 )}
