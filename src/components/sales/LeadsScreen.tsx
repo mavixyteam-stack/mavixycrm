@@ -177,11 +177,11 @@ export default function LeadsScreen() {
         const st = STATUS_STYLE[lead.lead_status] || STATUS_STYLE.new
         return (
           <>
-            {/* Backdrop — only covers the content area, not the sidebar */}
+            {/* Full-screen backdrop — covers header and sidebar so they're not interactive */}
             <div onClick={() => { setSelected(null); setAiPitch('') }}
-              style={{ position: 'fixed', top: 0, left: 224, right: 0, bottom: 0, zIndex: 999, background: 'rgba(15,23,42,.28)', backdropFilter: 'blur(1px)', animation: 'fadeIn .18s ease both' }} />
+              style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(15,23,42,.35)', backdropFilter: 'blur(2px)', animation: 'fadeIn .18s ease both' }} />
             <div onClick={e => e.stopPropagation()}
-              style={{ position: 'fixed', top: 0, right: 0, width: 460, height: '100vh', background: '#fff', boxShadow: '-8px 0 40px rgba(0,0,0,.14)', display: 'flex', flexDirection: 'column', animation: 'slideInRight .22s ease both', zIndex: 1000 }}>
+              style={{ position: 'fixed', top: 0, right: 0, width: 480, height: '100vh', background: '#FAFBF9', boxShadow: '-12px 0 60px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', animation: 'slideInRight .25s cubic-bezier(.2,.9,.3,1) both', zIndex: 1201 }}>
 
               {/* Drawer header */}
               <div style={{ padding: '20px 24px 18px', borderBottom: '1px solid var(--c-border-soft)' }}>
