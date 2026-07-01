@@ -131,6 +131,33 @@ export async function dbUpsertDeal(deal: Deal) {
   if (error) console.error('upsertDeal', error)
 }
 
+// ─── Attendance check-in / check-out ─────────────────────────────────────────
+
+function localDateStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+export async function dbCheckIn(userId: string) {
+  const sb = createClient()
+  const { error } = await sb.from('attendance').upsert({
+    user_id: userId,
+    date: localDateStr(),
+    check_in: new Date().toISOString(),
+    check_out: null,
+    break_minutes: 0,
+  }, { onConflict: 'user_id,date' })
+  if (error) console.error('dbCheckIn', error)
+}
+
+export async function dbCheckOut(userId: string, breakMinutes: number) {
+  const sb = createClient()
+  const { error } = await sb.from('attendance')
+    .update({ check_out: new Date().toISOString(), break_minutes: breakMinutes })
+    .eq('user_id', userId).eq('date', localDateStr())
+  if (error) console.error('dbCheckOut', error)
+}
+
 // ─── Attendance requests ──────────────────────────────────────────────────────
 
 export async function dbUpsertAttendanceRequest(req: AttendanceRequest) {

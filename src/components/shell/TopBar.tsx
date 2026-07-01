@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useApp, useToast } from '@/lib/store'
+import { dbCheckIn, dbCheckOut } from '@/lib/db'
 import { Sparkle, Bell, Search, Clock, Spinner, Check, X } from '@/components/ui/Icon'
 
 export default function TopBar() {
@@ -64,14 +65,24 @@ export default function TopBar() {
     }
   }
 
-  function checkIn() { dispatch({ type:'CHECK_IN' }); toast('Checked in — timer started') }
+  async function checkIn() {
+    dispatch({ type:'CHECK_IN' })
+    toast('Checked in — timer started')
+    if (state.currentUser?.id) await dbCheckIn(state.currentUser.id)
+  }
   function startBreak() { dispatch({ type:'START_BREAK' }); toast('On break — timer paused') }
   function endBreak() {
     const ms = state.breakStart ? Date.now() - state.breakStart.getTime() : 0
     dispatch({ type:'END_BREAK', ms })
     toast('Break ended — timer resumed')
   }
-  function checkOut() { dispatch({ type:'CHECK_OUT' }); toast(`Checked out — ${workingTime} logged`) }
+  async function checkOut() {
+    const breakMs = state.totalBreakMs + (state.onBreak && state.breakStart ? Date.now() - state.breakStart.getTime() : 0)
+    const breakMinutes = Math.round(breakMs / 60000)
+    dispatch({ type:'CHECK_OUT' })
+    toast(`Checked out — ${workingTime} logged`)
+    if (state.currentUser?.id) await dbCheckOut(state.currentUser.id, breakMinutes)
+  }
 
   const notifCount = 3
 
