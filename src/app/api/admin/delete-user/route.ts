@@ -36,10 +36,14 @@ export async function POST(req: NextRequest) {
   )
 
   // Best-effort: remove from Supabase Auth. Ghost profiles won't be there — that's fine.
-  // We never fail on auth errors because the profile row is what drives the UI.
   await admin.auth.admin.deleteUser(user_id)
 
-  // This is the authoritative delete — remove from profiles table.
+  // Unassign from any plan_items and tasks before deleting the profile
+  // (FK constraints prevent profile deletion while references exist)
+  await admin.from('plan_items').update({ assignee_id: null }).eq('assignee_id', user_id)
+  await admin.from('tasks').update({ assignee_id: null }).eq('assignee_id', user_id)
+
+  // Authoritative delete — remove the profile row
   const { error: profileError } = await admin.from('profiles').delete().eq('id', user_id)
   if (profileError) {
     return NextResponse.json({ error: profileError.message }, { status: 400 })
