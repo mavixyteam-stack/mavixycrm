@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useApp, useToast, useUpsertClient, useDeleteClient } from '@/lib/store'
 import { Sparkle, Spinner } from '@/components/ui/Icon'
 import { STATUS_PIPE } from '@/lib/seed-data'
+import ConnectedAccounts from './ConnectedAccounts'
 
 function HealthRing({ score, size = 80 }: { score: number; size?: number }) {
   const r = (size - 14) / 2
@@ -56,14 +57,6 @@ export default function ClientDetail() {
     { label: 'Stories',   count: typeCounts['Story'] || 0,     color: '#10B981' },
     { label: 'Posts',     count: typeCounts['Post'] || 0,      color: '#3B82F6' },
   ]
-
-  const clientHandle = client.name.toLowerCase().replace(/\s+/g, '').slice(0, 12)
-  const SOCIALS = [
-    { key: 'ig', letter: 'I', name: 'Instagram', handle: `@${clientHandle}`, color: '#E1306C', bg: '#FDF2F8', linked: true },
-    { key: 'fb', letter: 'F', name: 'Facebook Page', handle: client.name, color: '#1877F2', bg: '#EFF6FF', linked: true },
-    { key: 'yt', letter: 'Y', name: 'YouTube', handle: `@${clientHandle}`, color: '#FF0000', bg: '#FEF2F2', linked: false },
-  ]
-  const linkedCount = SOCIALS.filter(s => s.linked).length
 
   const ACTIVITY = [
     { dot: '#10B981', text: `Latest content approved by ${client.name}`, time: 'Today, 9:14 AM' },
@@ -235,32 +228,8 @@ export default function ClientDetail() {
             )}
           </div>
 
-          {/* Connected accounts */}
-          <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 18, padding: '18px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--c-ink)" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>Connected accounts</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#10B981', background: '#ECFDF5', borderRadius: 20, padding: '2px 9px' }}>{linkedCount} linked</span>
-              </div>
-              <span style={{ fontSize: 11.5, color: 'var(--c-ghost)', marginLeft: 'auto' }}>{client.name}'s own channels — used to schedule, publish & pull reports</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
-              {SOCIALS.map(s => (
-                <div key={s.key} style={{ border: '1px solid var(--c-border-soft)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 9, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: s.color, flexShrink: 0 }}>{s.letter}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--c-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.handle}</div>
-                  </div>
-                  {s.linked
-                    ? <span style={{ fontSize: 11, fontWeight: 700, color: '#10B981', background: '#ECFDF5', borderRadius: 7, padding: '3px 8px', whiteSpace: 'nowrap' }}>Linked</span>
-                    : <button onClick={() => toast('Connect feature coming soon')} style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', background: '#FF5C1F', borderRadius: 7, padding: '4px 9px', whiteSpace: 'nowrap' }}>Connect</button>
-                  }
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Connected accounts — dynamic per client services */}
+          <ConnectedAccounts client={client} onUpdate={upsertClient} />
 
           {/* Upcoming content */}
           <div style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 18, padding: '18px 20px' }}>

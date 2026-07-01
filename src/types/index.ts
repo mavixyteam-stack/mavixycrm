@@ -41,6 +41,7 @@ export interface Client {
   target_audience?: string
   brand_voice?: string
   reference_links?: string
+  connections?: Record<string, boolean>
   created_at: string
 }
 
