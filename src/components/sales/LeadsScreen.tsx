@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useApp, useToast } from '@/lib/store'
 import { Plus, X, Sparkle, Spinner } from '@/components/ui/Icon'
 
@@ -170,14 +171,14 @@ export default function LeadsScreen() {
         })}
       </div>
 
-      {/* Lead detail drawer */}
+      {/* Lead detail drawer — portalled to document.body to escape stacking contexts */}
       {selected && (() => {
         const lead = leads.find(l => l.id === selected.id) || selected
         const sc = SCORE_STYLE[lead.score]
         const st = STATUS_STYLE[lead.lead_status] || STATUS_STYLE.new
-        return (
+        return createPortal(
           <>
-            {/* Full-screen backdrop — covers header and sidebar so they're not interactive */}
+            {/* Full-screen backdrop */}
             <div onClick={() => { setSelected(null); setAiPitch('') }}
               style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(15,23,42,.35)', backdropFilter: 'blur(2px)', animation: 'fadeIn .18s ease both' }} />
             <div onClick={e => e.stopPropagation()}
@@ -310,7 +311,8 @@ export default function LeadsScreen() {
                 </button>
               </div>
             </div>
-          </>
+          </>,
+          document.body
         )
       })()}
 
