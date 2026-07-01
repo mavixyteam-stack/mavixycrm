@@ -35,23 +35,15 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
   )
 
-  // Try to delete from Supabase Auth
-  const { error: authError } = await admin.auth.admin.deleteUser(user_id)
+  // Best-effort: remove from Supabase Auth. Ghost profiles won't be there — that's fine.
+  // We never fail on auth errors because the profile row is what drives the UI.
+  await admin.auth.admin.deleteUser(user_id)
 
-  // Ghost profiles (created before service key was configured) don't exist in auth.users.
-  // Supabase returns "not found" OR "Database error deleting user" for missing users.
-  // Either way, fall through and clean up the profile row.
-  const isGhostError = authError && (
-    authError.message.toLowerCase().includes('not found') ||
-    authError.message.toLowerCase().includes('user not found') ||
-    authError.message.toLowerCase().includes('database error')
-  )
-  if (authError && !isGhostError) {
-    return NextResponse.json({ error: authError.message }, { status: 400 })
+  // This is the authoritative delete — remove from profiles table.
+  const { error: profileError } = await admin.from('profiles').delete().eq('id', user_id)
+  if (profileError) {
+    return NextResponse.json({ error: profileError.message }, { status: 400 })
   }
-
-  // Always delete the profile row (cascade handles related data)
-  await admin.from('profiles').delete().eq('id', user_id)
 
   return NextResponse.json({ ok: true })
 }
