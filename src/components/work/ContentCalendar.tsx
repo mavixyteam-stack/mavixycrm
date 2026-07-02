@@ -58,6 +58,7 @@ export default function ContentCalendar() {
     setMonthAutoSet(true)
   }, [state.planItems, monthAutoSet])
   const [calClient, setCalClient] = useState('all')
+  const [memberFilter, setMemberFilter] = useState('all')
   const [weekFilter, setWeekFilter] = useState<'today'|'w1'|'w2'|'w3'|'w4'|'w5'|'month'>('today')
   const [draggingId, setDraggingId] = useState<string|null>(null)
   const [dragOverCol, setDragOverCol] = useState<string|null>(null)
@@ -67,9 +68,24 @@ export default function ContentCalendar() {
   const isCurMonth = now.getFullYear() === my && now.getMonth() + 1 === mm
   const todayDate = now.getDate()
 
-  const allItems = state.planItems
-  const mItems = allItems.filter(it => it.month === monthKey)
+  const uid = state.currentUser?.id
+  const role = state.currentUser?.role
+
+  // Role-based visibility: employee/sales → own only; manager → all non-owners; owner → all
+  const visibleItems = state.planItems.filter(it => {
+    if (role === 'owner') return true
+    if (role === 'manager') {
+      const assignee = state.users.find(u => u.id === it.assignee_id)
+      return assignee?.role !== 'owner'
+    }
+    return it.assignee_id === uid
+  })
+
+  const mItems = visibleItems.filter(it => it.month === monthKey)
   const clientItems = mItems.filter(it => calClient === 'all' || it.client_id === calClient)
+  const memberFiltered = memberFilter === 'all'
+    ? clientItems
+    : clientItems.filter(it => it.assignee_id === memberFilter)
 
   // Scope filter
   const inScope = (it: PlanItem): boolean => {
@@ -80,10 +96,16 @@ export default function ContentCalendar() {
     if (it.day == null) return false
     return it.day >= wr.start && it.day <= wr.end
   }
-  const scopedItems = clientItems.filter(inScope)
-  const overdueCount = clientItems.filter(it =>
+  const scopedItems = memberFiltered.filter(inScope)
+  const overdueCount = memberFiltered.filter(it =>
     it.status !== 'published' && it.day != null && isCurMonth && it.day < todayDate
   ).length
+
+  // Member list for filter (only relevant for owner/manager)
+  const isManager = role === 'owner' || role === 'manager'
+  const filterableMembers = state.users.filter(u =>
+    role === 'owner' ? true : u.role !== 'owner'
+  )
 
   function shiftMonth(delta: number) {
     let { y, m } = parseMonth(monthKey)
@@ -150,7 +172,7 @@ export default function ContentCalendar() {
           <div style={{ display:'flex', alignItems:'center', gap:8, color:'var(--c-faint)', fontSize:13, fontWeight:500, marginBottom:7 }}>
             Content Calendar
             <span style={{ width:4, height:4, borderRadius:'50%', background:'var(--c-rule)' }} />
-            <span style={{ fontWeight:600, color:'var(--c-subtle)' }}>{clientItems.length} pieces</span>
+            <span style={{ fontWeight:600, color:'var(--c-subtle)' }}>{memberFiltered.length} pieces</span>
             <span style={{ width:4, height:4, borderRadius:'50%', background:'var(--c-rule)' }} />
             {monthLabel(monthKey)}
           </div>
@@ -178,6 +200,28 @@ export default function ContentCalendar() {
           </button>
         </div>
       </div>
+
+      {/* Member filter row — owners and managers only */}
+      {isManager && (
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+          <span style={{ fontSize:11.5, fontWeight:700, color:'var(--c-faint)', textTransform:'uppercase', letterSpacing:'.06em', marginRight:2 }}>Team</span>
+          <button onClick={() => setMemberFilter('all')}
+            style={{ padding:'5px 13px', borderRadius:99, fontSize:12.5, fontWeight:700, background: memberFilter === 'all' ? 'var(--c-ink)' : 'var(--c-fill)', color: memberFilter === 'all' ? '#fff' : 'var(--c-muted)', transition:'all .12s', border:'none', cursor:'pointer' }}>
+            All
+          </button>
+          {filterableMembers.map(u => {
+            const sel = memberFilter === u.id
+            return (
+              <button key={u.id} onClick={() => setMemberFilter(u.id)}
+                title={u.name}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 10px 4px 4px', borderRadius:99, fontSize:12.5, fontWeight:600, background: sel ? u.color || 'var(--c-ink)' : 'var(--c-fill)', color: sel ? '#fff' : 'var(--c-ink)', border: sel ? 'none' : '1.5px solid var(--c-border)', transition:'all .12s', cursor:'pointer' }}>
+                <span style={{ width:22, height:22, borderRadius:'50%', background: sel ? 'rgba(255,255,255,.25)' : u.color || '#6B7280', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:8.5, flexShrink:0 }}>{u.initials}</span>
+                {u.name.split(' ')[0]}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Filters + Week tabs row */}
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
