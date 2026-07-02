@@ -71,13 +71,12 @@ export default function ContentCalendar() {
   const uid = state.currentUser?.id
   const role = state.currentUser?.role
 
-  // Role-based visibility: employee/sales → own only; manager → all non-owners; owner → all
+  // Role-based visibility: sales not in content calendar; employee → own only; manager → non-owner content team; owner → all content team
   const visibleItems = state.planItems.filter(it => {
+    const assignee = state.users.find(u => u.id === it.assignee_id)
+    if (assignee?.role === 'sales') return false // sales never in content calendar
     if (role === 'owner') return true
-    if (role === 'manager') {
-      const assignee = state.users.find(u => u.id === it.assignee_id)
-      return assignee?.role !== 'owner'
-    }
+    if (role === 'manager') return assignee?.role !== 'owner'
     return it.assignee_id === uid
   })
 
@@ -103,9 +102,11 @@ export default function ContentCalendar() {
 
   // Member list for filter (only relevant for owner/manager)
   const isManager = role === 'owner' || role === 'manager'
-  const filterableMembers = state.users.filter(u =>
-    role === 'owner' ? true : u.role !== 'owner'
-  )
+  const filterableMembers = state.users.filter(u => {
+    if (u.role === 'sales') return false
+    if (role === 'owner') return true
+    return u.role !== 'owner'
+  })
 
   function shiftMonth(delta: number) {
     let { y, m } = parseMonth(monthKey)
