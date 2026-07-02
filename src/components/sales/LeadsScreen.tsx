@@ -71,7 +71,7 @@ export default function LeadsScreen() {
     const initials = form.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
     const color = COLORS[leads.length % COLORS.length]
     upsertDeal({
-      id: `lead-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: form.name,
       company: form.company,
       value: parseBudgetValue(form.budget_text),

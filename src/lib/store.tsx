@@ -68,6 +68,7 @@ type Action =
   | { type: 'OPEN_EDIT_USER'; id: string }
   | { type: 'CLOSE_USER_MODAL' }
   | { type: 'CHECK_IN' }
+  | { type: 'RESTORE_CHECK_IN'; checkInTime: Date }
   | { type: 'START_BREAK' }
   | { type: 'END_BREAK'; ms: number }
   | { type: 'CHECK_OUT' }
@@ -157,6 +158,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'OPEN_EDIT_USER': return { ...state, addUserOpen: true, editUserId: action.id }
     case 'CLOSE_USER_MODAL': return { ...state, addUserOpen: false, editUserId: null }
     case 'CHECK_IN': return { ...state, checkedIn: true, checkInTime: new Date(), onBreak: false, totalBreakMs: 0 }
+    case 'RESTORE_CHECK_IN': return { ...state, checkedIn: true, checkInTime: action.checkInTime }
     case 'START_BREAK': return { ...state, onBreak: true, breakStart: new Date() }
     case 'END_BREAK': return { ...state, onBreak: false, breakStart: null, totalBreakMs: state.totalBreakMs + action.ms }
     case 'CHECK_OUT': return { ...state, checkedIn: false, checkInTime: null, onBreak: false, breakStart: null, totalBreakMs: 0 }
@@ -177,6 +179,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (profile) dispatch({ type: 'SET_USER', user: profile })
         else dispatch({ type: 'AUTH_LOADED' })
         await fetchWorkspace(dispatch)
+        await restoreCheckIn(sb, session.user.id, dispatch)
       } else {
         dispatch({ type: 'AUTH_LOADED' })
       }
@@ -189,6 +192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
         if (profile) dispatch({ type: 'SET_USER', user: profile })
         await fetchWorkspace(dispatch)
+        await restoreCheckIn(sb, session.user.id, dispatch)
       }
     })
     return () => subscription.unsubscribe()
@@ -211,6 +215,24 @@ async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
     })
   } catch (e) {
     console.error('fetchWorkspace', e)
+  }
+}
+
+// Restore check-in state after page refresh by reading today's attendance row
+async function restoreCheckIn(
+  sb: ReturnType<typeof import('./supabase/client').createClient>,
+  userId: string,
+  dispatch: React.Dispatch<Action>
+) {
+  try {
+    const today = new Date()
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+    const { data } = await sb.from('attendance').select('check_in, check_out').eq('user_id', userId).eq('date', dateStr).maybeSingle()
+    if (data?.check_in && !data?.check_out) {
+      dispatch({ type: 'RESTORE_CHECK_IN', checkInTime: new Date(data.check_in) })
+    }
+  } catch (e) {
+    console.error('restoreCheckIn', e)
   }
 }
 
@@ -285,10 +307,11 @@ export function useUpsertTask() {
 
 export function useUpsertDeal() {
   const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
   return useCallback(async (deal: Deal) => {
     dispatch({ type: 'UPSERT_DEAL', deal })
-    await dbUpsertDeal(deal)
-  }, [dispatch])
+    try { await dbUpsertDeal(deal) } catch (e) { errToast('upsertDeal', e) }
+  }, [dispatch, errToast])
 }
 
 export function useUpsertAttendanceRequest() {

@@ -69,7 +69,10 @@ export default function TopBar() {
   async function checkIn() {
     dispatch({ type:'CHECK_IN' })
     toast('Checked in — timer started')
-    if (state.currentUser?.id) await dbCheckIn(state.currentUser.id)
+    if (state.currentUser?.id) {
+      try { await dbCheckIn(state.currentUser.id) }
+      catch { toast('Check-in saved locally — DB sync failed, check console') }
+    }
   }
   function startBreak() { dispatch({ type:'START_BREAK' }); toast('On break — timer paused') }
   function endBreak() {
@@ -82,7 +85,10 @@ export default function TopBar() {
     const breakMinutes = Math.round(breakMs / 60000)
     dispatch({ type:'CHECK_OUT' })
     toast(`Checked out — ${workingTime} logged`)
-    if (state.currentUser?.id) await dbCheckOut(state.currentUser.id, breakMinutes)
+    if (state.currentUser?.id) {
+      try { await dbCheckOut(state.currentUser.id, breakMinutes) }
+      catch { toast('Check-out saved locally — DB sync failed, check console') }
+    }
   }
 
   const notifCount = 3

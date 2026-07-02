@@ -143,7 +143,7 @@ export async function dbUpsertDeal(deal: Deal) {
     initials: deal.initials || null,
     color: deal.color || null,
   })
-  if (error) console.error('upsertDeal', error)
+  if (error) { console.error('upsertDeal', error); throw error }
 }
 
 // ─── Attendance check-in / check-out ─────────────────────────────────────────
@@ -162,7 +162,7 @@ export async function dbCheckIn(userId: string) {
     check_out: null,
     break_minutes: 0,
   }, { onConflict: 'user_id,date' })
-  if (error) console.error('dbCheckIn', error)
+  if (error) { console.error('dbCheckIn', error); throw error }
 }
 
 export async function dbCheckOut(userId: string, breakMinutes: number) {
@@ -170,7 +170,7 @@ export async function dbCheckOut(userId: string, breakMinutes: number) {
   const { error } = await sb.from('attendance')
     .update({ check_out: new Date().toISOString(), break_minutes: breakMinutes })
     .eq('user_id', userId).eq('date', localDateStr())
-  if (error) console.error('dbCheckOut', error)
+  if (error) { console.error('dbCheckOut', error); throw error }
 }
 
 // ─── Attendance requests ──────────────────────────────────────────────────────

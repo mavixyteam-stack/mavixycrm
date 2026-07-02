@@ -30,7 +30,7 @@ export default function MyDay() {
     if (!nw.title.trim()) return
     dispatch({
       type: 'UPSERT_TASK', task: {
-        id: `task-${Date.now()}`,
+        id: crypto.randomUUID(),
         title: nw.title,
         client_id: nw.clientId,
         type: nw.type,
