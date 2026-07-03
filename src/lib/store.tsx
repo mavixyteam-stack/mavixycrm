@@ -6,7 +6,7 @@ import {
   loadWorkspace,
   dbUpsertPlanItem, dbDeletePlanItem,
   dbUpsertClient, dbDeleteClient,
-  dbUpsertTask, dbUpsertDeal,
+  dbUpsertTask, dbUpsertDeal, dbDeleteDeal,
   dbUpsertAttendanceRequest, dbUpdateAttendanceRequest,
 } from './db'
 
@@ -56,6 +56,7 @@ type Action =
   | { type: 'DELETE_USER'; id: string }
   | { type: 'SET_DEALS'; deals: Deal[] }
   | { type: 'UPSERT_DEAL'; deal: Deal }
+  | { type: 'DELETE_DEAL'; id: string }
   | { type: 'SET_ATTENDANCE'; attendance: AttendanceRecord[] }
   | { type: 'UPSERT_ATT_REQUEST'; request: AttendanceRequest }
   | { type: 'UPDATE_ATT_REQUEST'; id: string; status: 'approved' | 'rejected'; reviewed_by: string; rejection_reason?: string }
@@ -139,6 +140,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_USER': return { ...state, users: state.users.filter(x => x.id !== action.id) }
     case 'SET_DEALS': return { ...state, deals: action.deals }
     case 'UPSERT_DEAL': return { ...state, deals: upsert(state.deals, action.deal) }
+    case 'DELETE_DEAL': return { ...state, deals: state.deals.filter(x => x.id !== action.id) }
     case 'SET_ATTENDANCE': return { ...state, attendance: action.attendance }
     case 'UPSERT_ATT_REQUEST': return { ...state, attendanceRequests: upsert(state.attendanceRequests, action.request) }
     case 'UPDATE_ATT_REQUEST': return {
@@ -311,6 +313,15 @@ export function useUpsertDeal() {
   return useCallback(async (deal: Deal) => {
     dispatch({ type: 'UPSERT_DEAL', deal })
     try { await dbUpsertDeal(deal) } catch (e) { errToast('upsertDeal', e) }
+  }, [dispatch, errToast])
+}
+
+export function useDeleteDeal() {
+  const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
+  return useCallback(async (id: string) => {
+    dispatch({ type: 'DELETE_DEAL', id })
+    try { await dbDeleteDeal(id) } catch (e) { errToast('deleteDeal', e) }
   }, [dispatch, errToast])
 }
 

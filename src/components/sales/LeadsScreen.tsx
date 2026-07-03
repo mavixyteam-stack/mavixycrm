@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useApp, useToast, useUpsertDeal } from '@/lib/store'
+import { useApp, useToast, useUpsertDeal, useDeleteDeal } from '@/lib/store'
 import { Plus, X, Sparkle, Spinner } from '@/components/ui/Icon'
 
 const SCORE_STYLE = {
@@ -46,6 +46,8 @@ export default function LeadsScreen() {
   const { state } = useApp()
   const toast = useToast()
   const upsertDeal = useUpsertDeal()
+  const deleteDeal = useDeleteDeal()
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   // Leads = deals at stage 'lead' — same data source as Pipeline
   const leads = state.deals.filter(d => d.stage === 'lead')
@@ -371,6 +373,10 @@ export default function LeadsScreen() {
               </div>
 
               <div style={{ padding: '14px 24px', borderTop: '1px solid var(--c-border-soft)', background: '#fff', display: 'flex', gap: 10 }}>
+                <button onClick={() => setConfirmDelete(lead.id)}
+                  style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--c-border)', fontSize: 13.5, fontWeight: 600, color: 'var(--c-red)', cursor: 'pointer', background: '#fff', flexShrink: 0 }}>
+                  Delete
+                </button>
                 <button onClick={() => updateLeadStatus(lead.id, 'contacted')}
                   style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid var(--c-border)', fontSize: 13.5, fontWeight: 600, color: 'var(--c-ink-3)', cursor: 'pointer', background: '#fff' }}>
                   Mark contacted
@@ -387,6 +393,33 @@ export default function LeadsScreen() {
           document.body
         )
       })()}
+
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <div onClick={() => setConfirmDelete(null)} className="modal-overlay">
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .2s cubic-bezier(.2,.9,.3,1) both' }}>
+            <div style={{ padding: '24px 24px 20px' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--c-red-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, marginBottom: 8 }}>Delete this lead?</div>
+              <div style={{ fontSize: 13.5, color: 'var(--c-subtle)', lineHeight: 1.5 }}>This will permanently remove the lead and cannot be undone.</div>
+            </div>
+            <div style={{ padding: '0 24px 20px', display: 'flex', gap: 10 }}>
+              <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border)', fontSize: 14, fontWeight: 600, color: 'var(--c-subtle)', cursor: 'pointer', background: '#fff' }}>Cancel</button>
+              <button onClick={async () => {
+                const id = confirmDelete
+                setConfirmDelete(null)
+                setSelected(null)
+                await deleteDeal(id)
+                toast('Lead deleted')
+              }} style={{ flex: 1, padding: '11px', borderRadius: 10, background: '#EF4444', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
+                Delete lead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Lead Modal */}
       {addOpen && (

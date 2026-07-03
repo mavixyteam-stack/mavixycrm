@@ -134,6 +134,10 @@ export async function dbUpsertTask(task: Task) {
 
 // ─── Deals / Leads ────────────────────────────────────────────────────────────
 
+export async function dbDeleteDeal(id: string) {
+  await apiDelete('deals', id)
+}
+
 export async function dbUpsertDeal(deal: Deal) {
   await apiUpsert('deals', {
     id: deal.id,
