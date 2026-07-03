@@ -5,7 +5,6 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 const ALLOWED_TABLES = ['deals', 'tasks', 'clients', 'plan_items', 'attendance', 'attendance_requests', 'profiles']
 
 export async function POST(req: NextRequest) {
-  // Verify the caller is authenticated
   const sb = await createServerClient()
   const { data: { user } } = await sb.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -15,13 +14,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid table' }, { status: 400 })
   }
 
-  // Use service role to bypass RLS
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 
-  const { error } = await admin.from(table).upsert(row)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  // Retry loop: strip unknown columns and retry until success
+  let currentRow = { ...row }
+  const strippedCols: string[] = []
+  const maxRetries = Object.keys(row).length
+
+  for (let i = 0; i <= maxRetries; i++) {
+    const { error } = await admin.from(table).upsert(currentRow)
+    if (!error) {
+      return NextResponse.json({ ok: true, strippedCols: strippedCols.length ? strippedCols : undefined })
+    }
+
+    // If the error is about a missing column, remove it and retry
+    const match = error.message?.match(/Could not find the '(.+?)' column/)
+    if (match) {
+      const col = match[1]
+      strippedCols.push(col)
+      delete currentRow[col]
+      continue
+    }
+
+    // Any other error — fail immediately
+    console.error(`upsert ${table}:`, error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ error: 'Could not resolve schema mismatch', strippedCols }, { status: 500 })
 }
