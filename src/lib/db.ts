@@ -1,6 +1,32 @@
 import { createClient } from './supabase/client'
 import type { PlanItem, Task, Deal, Client, AttendanceRequest } from '@/types'
 
+// ─── Server-side write helper (bypasses RLS via service role key) ─────────────
+
+async function apiUpsert(table: string, row: Record<string, unknown>) {
+  const res = await fetch('/api/data/upsert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table, row }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(body.error || `Save to ${table} failed`)
+  }
+}
+
+async function apiDelete(table: string, id: string) {
+  const res = await fetch('/api/data/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ table, id }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(body.error || `Delete from ${table} failed`)
+  }
+}
+
 // ─── Load all workspace data after login ─────────────────────────────────────
 
 export async function loadWorkspace() {
@@ -33,8 +59,7 @@ export async function loadWorkspace() {
 // ─── Plan items ───────────────────────────────────────────────────────────────
 
 export async function dbUpsertPlanItem(item: PlanItem) {
-  const sb = createClient()
-  const { error } = await sb.from('plan_items').upsert({
+  await apiUpsert('plan_items', {
     id: item.id,
     month: item.month,
     client_id: item.client_id,
@@ -48,19 +73,16 @@ export async function dbUpsertPlanItem(item: PlanItem) {
     day: item.day,
     status: item.status,
   })
-  if (error) { console.error('upsertPlanItem', error); throw error }
 }
 
 export async function dbDeletePlanItem(id: string) {
-  const sb = createClient()
-  await sb.from('plan_items').delete().eq('id', id)
+  await apiDelete('plan_items', id)
 }
 
 // ─── Clients ─────────────────────────────────────────────────────────────────
 
 export async function dbUpsertClient(client: Client) {
-  const sb = createClient()
-  const payload: Record<string, unknown> = {
+  await apiUpsert('clients', {
     id: client.id,
     name: client.name,
     initials: client.initials,
@@ -68,42 +90,33 @@ export async function dbUpsertClient(client: Client) {
     health: client.health,
     services: client.services,
     type: client.type,
-    industry: client.industry,
-    contact_name: client.contact_name,
-    contact_email: client.contact_email,
-    whatsapp: client.whatsapp,
+    industry: client.industry || null,
+    contact_name: client.contact_name || null,
+    contact_email: client.contact_email || null,
+    whatsapp: client.whatsapp || null,
     account_owner_id: client.account_owner_id || null,
-    posts_per_month: client.posts_per_month,
-    monthly_retainer: client.monthly_retainer,
-    ai_brief: client.ai_brief,
-    about_business: client.about_business,
-    target_audience: client.target_audience,
-    brand_voice: client.brand_voice,
-    reference_links: client.reference_links,
-  }
-  // connections column may not exist if migration hasn't been run yet — try with, fall back without
-  const { error } = await sb.from('clients').upsert({ ...payload, connections: client.connections || {} })
-  if (error) {
-    console.warn('upsertClient with connections failed, retrying without:', error.message)
-    const { error: error2 } = await sb.from('clients').upsert(payload)
-    if (error2) { console.error('upsertClient', error2); throw error2 }
-  }
+    posts_per_month: client.posts_per_month || null,
+    monthly_retainer: client.monthly_retainer || null,
+    ai_brief: client.ai_brief || null,
+    about_business: client.about_business || null,
+    target_audience: client.target_audience || null,
+    brand_voice: client.brand_voice || null,
+    reference_links: client.reference_links || null,
+    connections: client.connections || {},
+  })
 }
 
 export async function dbDeleteClient(id: string) {
   const sb = createClient()
-  // Cascade: delete related plan items and tasks first
   await sb.from('plan_items').delete().eq('client_id', id)
   await sb.from('tasks').delete().eq('client_id', id)
-  const { error } = await sb.from('clients').delete().eq('id', id)
-  if (error) console.error('deleteClient', error)
+  await apiDelete('clients', id)
 }
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export async function dbUpsertTask(task: Task) {
-  const sb = createClient()
-  const { error } = await sb.from('tasks').upsert({
+  await apiUpsert('tasks', {
     id: task.id,
     title: task.title,
     client_id: task.client_id || null,
@@ -112,19 +125,17 @@ export async function dbUpsertTask(task: Task) {
     due: task.due,
     priority: task.priority,
     done: task.done,
-    idea: task.idea,
-    hook: task.hook,
-    format: task.format,
-    refs: task.refs,
+    idea: task.idea || null,
+    hook: task.hook || null,
+    format: task.format || null,
+    refs: task.refs || null,
   })
-  if (error) console.error('upsertTask', error)
 }
 
-// ─── Deals ────────────────────────────────────────────────────────────────────
+// ─── Deals / Leads ────────────────────────────────────────────────────────────
 
 export async function dbUpsertDeal(deal: Deal) {
-  const sb = createClient()
-  const { error } = await sb.from('deals').upsert({
+  await apiUpsert('deals', {
     id: deal.id,
     name: deal.name,
     company: deal.company,
@@ -143,7 +154,6 @@ export async function dbUpsertDeal(deal: Deal) {
     initials: deal.initials || null,
     color: deal.color || null,
   })
-  if (error) { console.error('upsertDeal', error); throw error }
 }
 
 // ─── Attendance check-in / check-out ─────────────────────────────────────────
@@ -154,30 +164,37 @@ function localDateStr(): string {
 }
 
 export async function dbCheckIn(userId: string) {
-  const sb = createClient()
-  const { error } = await sb.from('attendance').upsert({
+  await apiUpsert('attendance', {
     user_id: userId,
     date: localDateStr(),
     check_in: new Date().toISOString(),
     check_out: null,
     break_minutes: 0,
-  }, { onConflict: 'user_id,date' })
-  if (error) { console.error('dbCheckIn', error); throw error }
+  })
 }
 
 export async function dbCheckOut(userId: string, breakMinutes: number) {
   const sb = createClient()
-  const { error } = await sb.from('attendance')
-    .update({ check_out: new Date().toISOString(), break_minutes: breakMinutes })
-    .eq('user_id', userId).eq('date', localDateStr())
-  if (error) { console.error('dbCheckOut', error); throw error }
+  const { data: existing } = await sb
+    .from('attendance')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', localDateStr())
+    .maybeSingle()
+
+  await apiUpsert('attendance', {
+    ...(existing || {}),
+    user_id: userId,
+    date: localDateStr(),
+    check_out: new Date().toISOString(),
+    break_minutes: breakMinutes,
+  })
 }
 
 // ─── Attendance requests ──────────────────────────────────────────────────────
 
 export async function dbUpsertAttendanceRequest(req: AttendanceRequest) {
-  const sb = createClient()
-  const { error } = await sb.from('attendance_requests').upsert({
+  await apiUpsert('attendance_requests', {
     id: req.id,
     user_id: req.user_id,
     type: req.type,
@@ -192,7 +209,6 @@ export async function dbUpsertAttendanceRequest(req: AttendanceRequest) {
     reviewed_at: req.reviewed_at || null,
     rejection_reason: req.rejection_reason || null,
   })
-  if (error) console.error('upsertAttendanceRequest', error)
 }
 
 export async function dbUpdateAttendanceRequest(
@@ -202,11 +218,19 @@ export async function dbUpdateAttendanceRequest(
   rejection_reason?: string,
 ) {
   const sb = createClient()
-  const { error } = await sb.from('attendance_requests').update({
-    status,
-    reviewed_by,
-    reviewed_at: new Date().toISOString(),
-    rejection_reason: rejection_reason || null,
-  }).eq('id', id)
-  if (error) console.error('updateAttendanceRequest', error)
+  const { data: existing } = await sb
+    .from('attendance_requests')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (existing) {
+    await apiUpsert('attendance_requests', {
+      ...existing,
+      status,
+      reviewed_by,
+      reviewed_at: new Date().toISOString(),
+      rejection_reason: rejection_reason || null,
+    })
+  }
 }
