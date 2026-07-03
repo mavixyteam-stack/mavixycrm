@@ -372,7 +372,7 @@ function OwnerView({ name, greeting, dateStr, state, dispatch }: { name: string;
             return (
               <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
                 <span style={{ width: 28, height: 28, borderRadius: 8, background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 10, fontFamily: 'var(--font-display)', flexShrink: 0 }}>{u.initials}</span>
-                <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 80, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name.split(' ')[0]}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 80, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u?.name?.split(' ')[0] || u?.initials || '?'}</div>
                 <div style={{ flex: 1, height: 6, background: 'var(--c-fill)', borderRadius: 5, overflow: 'hidden' }}>
                   <div style={{ height: '100%', borderRadius: 5, width: `${Math.min(pct, 100)}%`, background: col, transition: 'width .8s' }} />
                 </div>
@@ -431,7 +431,7 @@ function ManagerView({ name, greeting, dateStr, state, dispatch }: { name: strin
                 <span style={{ width: 30, height: 30, borderRadius: 8, background: u.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11, fontFamily: 'var(--font-display)' }}>{u.initials}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{u.name.split(' ')[0]}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{u?.name?.split(' ')[0] || u?.initials || '?'}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: col }}>{pct}%</span>
                   </div>
                   <div style={{ height: 6, background: 'var(--c-fill)', borderRadius: 5, overflow: 'hidden' }}>

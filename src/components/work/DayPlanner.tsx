@@ -169,7 +169,7 @@ export default function DayPlanner() {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#FF8A6B', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 5 }}>AI Workload Alert</div>
             <p style={{ fontSize: 14, color: '#E8E6E2', lineHeight: 1.55, fontWeight: 400 }}>
-              <strong style={{ color: '#fff', fontWeight: 700 }}>{overloaded.name.split(' ')[0]} is at {overloaded.pct}% capacity</strong>
+              <strong style={{ color: '#fff', fontWeight: 700 }}>{overloaded.name?.split(' ')[0] || overloaded.initials || '?'} is at {overloaded.pct}% capacity</strong>
               {' '}— {overloaded.total} open tasks assigned. Consider redistributing work across the team to avoid burnout.
             </p>
           </div>
@@ -260,7 +260,7 @@ export default function DayPlanner() {
                 {dayPlan.blocks.length <= 1 ? (
                   <div style={{ padding: '48px 20px', textAlign: 'center' }}>
                     <div style={{ fontSize: 13.5, color: 'var(--c-ghost)', marginBottom: 8 }}>
-                      No open tasks assigned to {selected.name.split(' ')[0]}
+                      No open tasks assigned to {selected.name?.split(' ')[0] || selected.initials || '?'}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--c-faint)' }}>Assign tasks in the Content Planner or Task board to build a day plan</div>
                   </div>
