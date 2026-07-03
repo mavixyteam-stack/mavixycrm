@@ -394,11 +394,12 @@ export default function LeadsScreen() {
         )
       })()}
 
-      {/* Confirm Delete Modal */}
-      {confirmDelete && (
-        <div onClick={() => setConfirmDelete(null)} className="modal-overlay">
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .2s cubic-bezier(.2,.9,.3,1) both' }}>
-            <div style={{ padding: '24px 24px 20px' }}>
+      {/* Confirm Delete Modal — portaled at z-index 1400, above the drawer (1201) */}
+      {confirmDelete && createPortal(
+        <div onClick={() => setConfirmDelete(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1400, background: 'rgba(15,23,42,.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .2s cubic-bezier(.2,.9,.3,1) both' }}>
+            <div style={{ padding: '24px 24px 18px' }}>
               <div style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--c-red-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               </div>
@@ -418,7 +419,8 @@ export default function LeadsScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Add Lead Modal */}
