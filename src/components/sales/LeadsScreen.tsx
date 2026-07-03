@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useApp, useToast, useUpsertDeal, useDeleteDeal } from '@/lib/store'
 import { Plus, X, Sparkle, Spinner } from '@/components/ui/Icon'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const SCORE_STYLE = {
   hot:  { c: '#DC2626', bg: '#FEE2E2', label: 'Hot' },
@@ -425,7 +426,7 @@ export default function LeadsScreen() {
 
       {/* Add Lead Modal */}
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="modal-overlay">
+        <ModalPortal><div onClick={() => setAddOpen(false)} className="modal-overlay">
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 500, background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-modal)', animation: 'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--c-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>Add lead</div>
@@ -520,7 +521,7 @@ export default function LeadsScreen() {
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   )

@@ -240,12 +240,14 @@ export default function TopBar() {
 
       {/* Toast */}
       {state.toast && (
-        <div className="toast">
-          <div style={{ width:20, height:20, borderRadius:'50%', background:'var(--c-accent)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <Check size={11} color="#fff" />
+        <ModalPortal>
+          <div className="toast">
+            <div style={{ width:20, height:20, borderRadius:'50%', background:'var(--c-accent)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <Check size={11} color="#fff" />
+            </div>
+            {state.toast}
           </div>
-          {state.toast}
-        </div>
+        </ModalPortal>
       )}
     </>
   )

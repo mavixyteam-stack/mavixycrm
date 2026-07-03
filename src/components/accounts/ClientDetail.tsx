@@ -4,6 +4,7 @@ import { useApp, useToast, useUpsertClient, useDeleteClient } from '@/lib/store'
 import { Sparkle, Spinner } from '@/components/ui/Icon'
 import { STATUS_PIPE } from '@/lib/seed-data'
 import ConnectedAccounts from './ConnectedAccounts'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 function HealthRing({ score, size = 80 }: { score: number; size?: number }) {
   const r = (size - 14) / 2
@@ -345,23 +346,25 @@ export default function ClientDetail() {
 
       {/* Delete modal */}
       {deleteOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => setDeleteOpen(false)}>
-          <div style={{ background: '#fff', borderRadius: 20, padding: 28, maxWidth: 420, width: '100%', margin: '0 20px' }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg>
-            </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Delete {client.name}?</div>
-            <p style={{ fontSize: 14, color: 'var(--c-subtle)', lineHeight: 1.65, marginBottom: 24 }}>
-              This will permanently remove this client and all associated content. This cannot be undone.
-            </p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setDeleteOpen(false)} style={{ flex: 1, padding: '11px 0', borderRadius: 11, fontSize: 14, fontWeight: 600, background: 'var(--c-fill)', color: 'var(--c-ink)' }}>Cancel</button>
-              <button onClick={handleDelete} style={{ flex: 1, padding: '11px 0', borderRadius: 11, fontSize: 14, fontWeight: 700, background: '#EF4444', color: '#fff' }}>Delete client</button>
+        <ModalPortal>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setDeleteOpen(false)}>
+            <div style={{ background: '#fff', borderRadius: 20, padding: 28, maxWidth: 420, width: '100%', margin: '0 20px' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Delete {client.name}?</div>
+              <p style={{ fontSize: 14, color: 'var(--c-subtle)', lineHeight: 1.65, marginBottom: 24 }}>
+                This will permanently remove this client and all associated content. This cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setDeleteOpen(false)} style={{ flex: 1, padding: '11px 0', borderRadius: 11, fontSize: 14, fontWeight: 600, background: 'var(--c-fill)', color: 'var(--c-ink)' }}>Cancel</button>
+                <button onClick={handleDelete} style={{ flex: 1, padding: '11px 0', borderRadius: 11, fontSize: 14, fontWeight: 700, background: '#EF4444', color: '#fff' }}>Delete client</button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   )

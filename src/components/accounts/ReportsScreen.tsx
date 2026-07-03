@@ -102,7 +102,7 @@ function ClientFriendlyView({ client, report, onClose }: { client: Client; repor
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 20px' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 20px' }}>
       {/* Close backdrop */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }} onClick={onClose} />
 
@@ -666,7 +666,7 @@ export default function ReportsScreen() {
 
       {/* Client-friendly view */}
       {clientViewOpen && client && report && (
-        <ClientFriendlyView client={client} report={report} onClose={() => setClientViewOpen(false)} />
+        <ModalPortal><ClientFriendlyView client={client} report={report} onClose={() => setClientViewOpen(false)} /></ModalPortal>
       )}
 
       {/* Send to client modal */}
