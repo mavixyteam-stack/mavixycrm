@@ -331,6 +331,24 @@ export default function LeadsScreen() {
                 )}
 
                 <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Follow-up Date</div>
+                  <input
+                    type="date"
+                    value={lead.follow_up_date || ''}
+                    onChange={e => {
+                      const updated = { ...lead, follow_up_date: e.target.value || null }
+                      upsertDeal(updated)
+                    }}
+                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '9px 12px', fontSize: 13.5, color: lead.follow_up_date ? 'var(--c-ink)' : 'var(--c-faint)', background: 'var(--c-fill)', boxSizing: 'border-box' }}
+                  />
+                  {lead.follow_up_date && (
+                    <div style={{ fontSize: 12, color: 'var(--c-amber)', marginTop: 5, fontWeight: 600 }}>
+                      📅 Follow-up email auto-sends to sales team on this date
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 18 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 10 }}>Update status</div>
                   <div style={{ display: 'flex', gap: 7 }}>
                     {(['new', 'contacted', 'qualified'] as const).map(s => {

@@ -155,6 +155,7 @@ export async function dbUpsertDeal(deal: Deal) {
     score: deal.score || null,
     lead_status: deal.lead_status || null,
     notes: deal.notes || null,
+    follow_up_date: deal.follow_up_date || null,
     initials: deal.initials || null,
     color: deal.color || null,
   })

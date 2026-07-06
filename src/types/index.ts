@@ -128,6 +128,7 @@ export interface Deal {
   score?: 'hot' | 'warm' | 'cold'
   lead_status?: 'new' | 'contacted' | 'qualified'
   notes?: string
+  follow_up_date?: string | null
   initials?: string
   color?: string
 }
