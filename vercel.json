@@ -3,5 +3,10 @@
   "buildCommand": "next build",
   "devCommand": "next dev",
   "installCommand": "npm install",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "crons": [
+    { "path": "/api/automations/morning-brief", "schedule": "0 3 * * 1-5" },
+    { "path": "/api/automations/lead-followup", "schedule": "30 3 * * *" },
+    { "path": "/api/automations/weekly-digest", "schedule": "30 2 * * 1" }
+  ]
 }

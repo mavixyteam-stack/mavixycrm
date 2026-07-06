@@ -267,19 +267,23 @@ export default function AutomationsScreen() {
 
       {/* Cron setup guide */}
       <div style={{ marginTop: 28, background: 'var(--c-surface)', borderRadius: 18, padding: '20px 24px', border: '1.5px solid var(--c-border)' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Vercel Cron Setup</div>
-        <div style={{ fontSize: 13, color: 'var(--c-subtle)', lineHeight: 1.65, marginBottom: 14 }}>
-          Add a <code style={{ background: 'var(--c-fill)', padding: '1px 6px', borderRadius: 5, fontSize: 12 }}>vercel.json</code> to your project root to schedule these automations automatically:
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>Scheduled Sending</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--c-green-bg)', borderRadius: 6, padding: '2px 8px' }}>
+            <Check size={10} color="var(--c-green)" />
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-green)' }}>Schedule committed</span>
+          </div>
         </div>
-        <pre style={{ background: '#0F172A', color: '#e2e8f0', borderRadius: 12, padding: '16px 18px', fontSize: 12.5, lineHeight: 1.6, overflow: 'auto', margin: 0 }}>{`{
-  "crons": [
-    { "path": "/api/automations/morning-brief", "schedule": "30 3 * * 1-5" },
-    { "path": "/api/automations/lead-followup",  "schedule": "30 3 * * *" },
-    { "path": "/api/automations/weekly-digest",  "schedule": "30 2 * * 1" }
-  ]
-}`}</pre>
-        <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 10 }}>
-          Times are in UTC. 3:30 UTC = 9:00 AM IST. Requires Vercel Pro or above.
+        <div style={{ fontSize: 13, color: 'var(--c-subtle)', lineHeight: 1.65, marginBottom: 14 }}>
+          The cron schedule below is already in <code style={{ background: 'var(--c-fill)', padding: '1px 6px', borderRadius: 5, fontSize: 12 }}>vercel.json</code>. To activate it, set a <code style={{ background: 'var(--c-fill)', padding: '1px 6px', borderRadius: 5, fontSize: 12 }}>CRON_SECRET</code> env var in Vercel — that secures the endpoints so only Vercel can trigger them.
+        </div>
+        <pre style={{ background: '#0F172A', color: '#e2e8f0', borderRadius: 12, padding: '16px 18px', fontSize: 12.5, lineHeight: 1.6, overflow: 'auto', margin: 0 }}>{`"crons": [
+  { "path": "/api/automations/morning-brief", "schedule": "0 3 * * 1-5" },
+  { "path": "/api/automations/lead-followup",  "schedule": "30 3 * * *" },
+  { "path": "/api/automations/weekly-digest",  "schedule": "30 2 * * 1" }
+]`}</pre>
+        <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 10, lineHeight: 1.6 }}>
+          Times are UTC. Morning brief 3:00 UTC = 8:30 AM IST · lead follow-up 3:30 UTC = 9:00 AM IST · weekly digest Monday 2:30 UTC = 8:00 AM IST. Vercel Cron requires the Pro plan.
         </div>
       </div>
 

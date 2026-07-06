@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { authorizeAutomation } from '@/lib/automation-auth'
 import { sendEmail, buildMorningBriefEmail, type BriefTask } from '@/lib/email'
 
 const admin = () => createClient(
@@ -8,10 +8,10 @@ const admin = () => createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
-export async function POST(req: NextRequest) {
-  const sb = await createServerClient()
-  const { data: { user } } = await sb.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+async function run(req: NextRequest) {
+  if (!(await authorizeAutomation(req))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const db = admin()
   const today = new Date()
@@ -76,3 +76,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, sent: results.filter(r => r.status === 'sent').length, results })
 }
+
+export const GET = run
+export const POST = run
