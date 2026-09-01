@@ -319,3 +319,47 @@ export function buildNotificationEmail(opts: {
   `
   return layout(content, title || text)
 }
+
+// ─── Onboarding welcome ───────────────────────────────────────────────────────
+
+export function buildWelcomeEmail(opts: {
+  name: string
+  workEmail: string
+  password: string
+  appUrl: string
+}) {
+  const { name, workEmail, password, appUrl } = opts
+  const first = name.split(' ')[0] || name
+
+  const cred = (label: string, value: string) => `
+    <tr>
+      <td style="padding:10px 0;font-size:13px;color:#9A9E94;width:130px;">${label}</td>
+      <td style="padding:10px 0;font-size:14px;font-weight:700;color:#0E0F0C;font-family:'SF Mono',Menlo,monospace;">${value}</td>
+    </tr>`
+
+  const content = `
+    ${header('WELCOME ABOARD', `Welcome to the team, ${first} 🎉`, '#0E8C63')}
+    <div style="padding:24px 28px 8px;font-size:15px;line-height:1.65;color:#3A3E33;">
+      We're thrilled to have you at Mavixy. Your accounts are set up and ready — here are your login details.
+    </div>
+
+    <div style="margin:12px 28px;background:#F5F6F2;border-radius:14px;padding:18px 20px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9A9E94;text-transform:uppercase;margin-bottom:6px;">Your login</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${cred('Email / ID', workEmail)}
+        ${cred('Password', password)}
+      </table>
+      <div style="font-size:12.5px;color:#B07E0C;background:#FBF1D6;border-radius:9px;padding:9px 12px;margin-top:12px;">
+        🔒 Please change this password after your first sign-in.
+      </div>
+    </div>
+
+    <div style="padding:8px 28px 4px;font-size:14px;line-height:1.6;color:#5A5E54;">
+      Use the same email and password for both <strong>Microsoft 365</strong> and <strong>Mavixy OS</strong>.
+    </div>
+    <div style="padding:12px 28px 26px;">
+      <a href="${appUrl}" style="display:inline-block;background:#FF5C1F;color:#fff;font-size:14px;font-weight:700;border-radius:11px;padding:13px 26px;text-decoration:none;">Sign in to Mavixy OS →</a>
+    </div>
+  `
+  return layout(content, `Welcome to Mavixy, ${first} — your account is ready`)
+}

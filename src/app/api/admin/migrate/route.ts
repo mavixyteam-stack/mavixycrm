@@ -81,7 +81,45 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
   END IF;
-END $$;`
+END $$;
+
+-- Employee onboarding pipeline
+CREATE TABLE IF NOT EXISTS onboarding_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token TEXT UNIQUE NOT NULL,
+  role TEXT NOT NULL DEFAULT 'employee',
+  title TEXT,
+  work_email TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_by UUID,
+  full_name TEXT,
+  personal_email TEXT,
+  phone TEXT,
+  emergency_phone TEXT,
+  aadhar_number TEXT,
+  pan_number TEXT,
+  aadhar_path TEXT,
+  pan_path TEXT,
+  bank_account_number TEXT,
+  bank_ifsc TEXT,
+  bank_name TEXT,
+  bank_branch TEXT,
+  submitted_at TIMESTAMPTZ,
+  m365_email TEXT,
+  created_profile_id UUID,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Sensitive PII (Aadhaar/PAN/bank): RLS on with NO permissive policy, so
+-- regular clients can't read it. All access goes through owner-checked,
+-- service-role server routes.
+ALTER TABLE onboarding_invites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mavixy_onboarding" ON onboarding_invites;
+
+-- Private storage bucket for onboarding documents (Aadhaar/PAN)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('onboarding-docs', 'onboarding-docs', false)
+ON CONFLICT (id) DO NOTHING;`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
