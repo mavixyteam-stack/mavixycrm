@@ -225,20 +225,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!userId) return
     const refresh = () => fetchNotifications(userId, dispatch)
 
-    const channel = sb
-      .channel(`notifications:${userId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        payload => dispatch({ type: 'ADD_NOTIFICATION', notification: payload.new as Notification }),
-      )
-      .subscribe()
-
+    // Poll + focus first, so these ALWAYS run even if realtime setup throws.
     const interval = setInterval(refresh, 30000)
     const onFocus = () => { if (document.visibilityState === 'visible') refresh() }
     document.addEventListener('visibilitychange', onFocus)
+
+    // Realtime is best-effort: instant when available, silently skipped if not.
+    let channel: ReturnType<typeof sb.channel> | null = null
+    try {
+      channel = sb
+        .channel(`notifications:${userId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+          payload => dispatch({ type: 'ADD_NOTIFICATION', notification: payload.new as Notification }),
+        )
+        .subscribe()
+    } catch (e) {
+      console.error('notifications realtime unavailable, using poll only', e)
+    }
+
     return () => {
-      sb.removeChannel(channel)
+      if (channel) sb.removeChannel(channel)
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onFocus)
     }
