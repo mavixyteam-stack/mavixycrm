@@ -20,11 +20,7 @@ const STATUS_STYLE: Record<string, { label: string; c: string; bg: string }> = {
   completed: { label: 'Onboarded', c: '#0E8C63', bg: '#E7FAF3' },
 }
 
-const ROLES = [
-  { key: 'employee', label: 'Employee' },
-  { key: 'sales', label: 'Sales' },
-  { key: 'manager', label: 'Manager' },
-]
+const DEPARTMENTS = ['Operations', 'Management', 'Creative', 'Marketing', 'Sales', 'Design', 'Content', 'Finance']
 
 export default function OnboardingScreen() {
   const { state } = useApp()
@@ -34,7 +30,7 @@ export default function OnboardingScreen() {
   const [invites, setInvites] = useState<Invite[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ personal_email: '', role: 'employee', department: '' })
+  const [form, setForm] = useState({ personal_email: '', title: '', department: 'Operations' })
   const [creating, setCreating] = useState(false)
   const [newLink, setNewLink] = useState<string | null>(null)
   const [detail, setDetail] = useState<Invite | null>(null)
@@ -81,7 +77,7 @@ export default function OnboardingScreen() {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>Onboarding</h1>
           <p style={{ fontSize: 14, color: 'var(--c-subtle)' }}>Invite a new hire, collect their details, and set up their accounts.</p>
         </div>
-        <button onClick={() => { setForm({ personal_email: '', role: 'employee', department: '' }); setNewLink(null); setCreateOpen(true) }}
+        <button onClick={() => { setForm({ personal_email: '', title: '', department: 'Operations' }); setNewLink(null); setCreateOpen(true) }}
           style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--c-accent)', color: '#fff', borderRadius: 10, padding: '10px 16px', fontWeight: 700, fontSize: 13.5, border: 'none', cursor: 'pointer' }}>
           <Plus size={14} color="#fff" />New onboarding
         </button>
@@ -156,18 +152,17 @@ export default function OnboardingScreen() {
                   <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 4 }}>The onboarding link is emailed here automatically.</div>
                 </div>
                 <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 8 }}>Role</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {ROLES.map(r => (
-                      <button key={r.key} onClick={() => setForm(f => ({ ...f, role: r.key }))}
-                        style={{ flex: 1, padding: '9px', borderRadius: 10, fontSize: 13, fontWeight: 700, border: `1.5px solid ${form.role === r.key ? 'var(--c-accent)' : 'var(--c-border)'}`, color: form.role === r.key ? 'var(--c-accent)' : 'var(--c-muted)', background: form.role === r.key ? 'rgba(255,92,31,.06)' : '#fff', cursor: 'pointer' }}>{r.label}</button>
-                    ))}
-                  </div>
+                  <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 6 }}>Role</label>
+                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Senior Content Designer"
+                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 4 }}>Their job title / what they'll do.</div>
                 </div>
                 <div>
                   <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 6 }}>Department</label>
-                  <input value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} placeholder="e.g. Social Media, Performance, Design"
-                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
+                  <select value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', background: '#fff', cursor: 'pointer' }}>
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
                 <button onClick={createInvite} disabled={creating || !form.personal_email.trim()}
                   style={{ padding: '12px', borderRadius: 11, background: 'var(--c-ink)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: creating || !form.personal_email.trim() ? 'default' : 'pointer', opacity: creating || !form.personal_email.trim() ? .6 : 1 }}>

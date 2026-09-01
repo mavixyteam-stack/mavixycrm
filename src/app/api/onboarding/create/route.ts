@@ -17,16 +17,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Only owners or managers can start onboarding' }, { status: 403 })
   }
 
-  const { role, department, personal_email } = await req.json()
+  const { title, department, personal_email } = await req.json()
   if (!personal_email?.trim()) {
     return NextResponse.json({ error: "The candidate's personal email is required" }, { status: 400 })
   }
   const token = makeInviteToken()
 
+  // System permission role is derived from the department (owner can change
+  // it later in Team & Permissions). "Role" on the form is the job title.
+  const dept = (department || '').toLowerCase()
+  const role = dept === 'management' ? 'manager' : dept === 'sales' ? 'sales' : 'employee'
+
   const { data, error } = await admin.from('onboarding_invites')
     .insert({
       token,
-      role: role || 'employee',
+      role,
+      title: title?.trim() || null,
       department: department?.trim() || null,
       personal_email: personal_email.trim(),
       status: 'pending',
@@ -45,7 +51,7 @@ export async function POST(req: NextRequest) {
   // Resend domain to reach external inboxes)
   let emailed = false
   try {
-    await sendEmail(personal_email.trim(), 'Welcome to Mavixy — complete your onboarding', buildOnboardingInviteEmail({ link, role, department }))
+    await sendEmail(personal_email.trim(), 'Welcome to Mavixy — complete your onboarding', buildOnboardingInviteEmail({ link, roleText: title, department }))
     emailed = true
   } catch (e) {
     console.error('onboarding invite email:', e)

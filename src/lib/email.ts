@@ -324,16 +324,15 @@ export function buildNotificationEmail(opts: {
 
 export function buildOnboardingInviteEmail(opts: {
   link: string
-  role?: string | null
+  roleText?: string | null
   department?: string | null
 }) {
-  const { link, role, department } = opts
-  const roleLine = [department, role].filter(Boolean).join(' · ')
+  const { link, roleText, department } = opts
 
   const content = `
     ${header('YOU\'RE INVITED', 'Welcome to Mavixy — let\'s get you set up', '#FF5C1F')}
     <div style="padding:24px 28px 8px;font-size:15px;line-height:1.65;color:#3A3E33;">
-      Congratulations and welcome aboard! ${roleLine ? `We're excited to have you join us${department ? ` in <strong>${department}</strong>` : ''}${role ? ` as ${role}` : ''}. ` : ''}
+      Congratulations and welcome aboard! ${(roleText || department) ? `We're excited to have you join us${department ? ` in <strong>${department}</strong>` : ''}${roleText ? ` as ${roleText}` : ''}. ` : ''}
       To finish setting up your employment, please fill in a few details — it takes about 3 minutes.
     </div>
     <div style="padding:14px 28px 8px;">
