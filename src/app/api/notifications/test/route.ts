@@ -52,14 +52,15 @@ export async function GET() {
     // 4b. Team roles + who the app would treat as approvers (owners/managers).
     // If this list is empty or missing the owner, that's why request
     // notifications never get created.
-    const { data: team } = await admin.from('profiles').select('id, name, role, email, telegram_chat_id')
+    const { data: team, error: teamErr } = await admin.from('profiles').select('*')
+    result.teamError = teamErr?.message ?? null
     result.team = (team || []).map(p => ({ name: p.name, role: p.role, telegramLinked: !!p.telegram_chat_id }))
     result.approversComputed = (team || [])
       .filter(p => ['owner', 'manager'].includes(p.role))
       .map(p => p.name)
 
     // 5. Telegram/email status for THIS user, and fire a full-pipeline test
-    const { data: me } = await admin.from('profiles').select('telegram_chat_id, email, name').eq('id', user.id).maybeSingle()
+    const { data: me } = await admin.from('profiles').select('*').eq('id', user.id).maybeSingle()
     const linked = !!me?.telegram_chat_id
     steps.channels = {
       telegramBotConfigured: telegramConfigured(),
