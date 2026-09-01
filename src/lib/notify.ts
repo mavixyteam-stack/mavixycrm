@@ -71,9 +71,11 @@ export async function createNotifications(
 
   // 2. External channels — look up each recipient's contact points
   if (wantEmail || wantTelegram) {
+    // select('*') so a not-yet-added telegram_chat_id column can't error the
+    // lookup and silently block email too.
     const { data: profiles } = await admin
       .from('profiles')
-      .select('id, name, email, telegram_chat_id')
+      .select('*')
       .in('id', ids)
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
