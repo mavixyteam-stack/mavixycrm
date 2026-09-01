@@ -88,7 +88,7 @@ async function run(req: NextRequest) {
       text: `You have ${parts.join(', ')}. Open My Day to get ahead of it.`,
       type,
       link: 'myday',
-    })
+    }, { email: false }) // in-app + Telegram; the morning brief already emails the day's work
     notified++
   }
 
@@ -105,7 +105,7 @@ async function run(req: NextRequest) {
       text: summary.slice(0, 3).join(' · ') + (allOverdue.length > 3 ? ` · +${allOverdue.length - 3} more` : ''),
       type: 'warning',
       link: 'myday',
-    })
+    }, { email: false }) // dedicated overdue email is sent below
 
     // One escalation email to each owner/manager with an address
     const leaders = (profiles || []).filter(p => ['owner', 'manager'].includes(p.role) && p.email)

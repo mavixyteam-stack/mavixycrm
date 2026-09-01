@@ -290,3 +290,32 @@ export function buildOpsAlertEmail(opts: {
 
   return layout(content_, subject)
 }
+
+// ─── Single notification ──────────────────────────────────────────────────────
+
+const NOTIF_ACCENT: Record<string, string> = {
+  success: '#0E8C63', warning: '#E5484D', reminder: '#FF5C1F', request: '#7C3AED', info: '#2563EB',
+}
+
+export function buildNotificationEmail(opts: {
+  recipientName: string
+  title?: string | null
+  text: string
+  type?: string
+  actionUrl?: string
+}) {
+  const { recipientName, title, text, type = 'info', actionUrl } = opts
+  const accent = NOTIF_ACCENT[type] || '#FF5C1F'
+
+  const content = `
+    ${header('MAVIXY', title || 'New notification', accent)}
+    <div style="padding:24px 28px 12px;">
+      <div style="font-size:14px;color:#9A9E94;margin-bottom:10px;">Hi ${recipientName},</div>
+      <div style="font-size:16px;line-height:1.6;color:#0E0F0C;">${text}</div>
+    </div>
+    ${actionUrl ? `<div style="padding:8px 28px 24px;">
+      <a href="${actionUrl}" style="display:inline-block;background:${accent};color:#fff;font-size:14px;font-weight:700;border-radius:11px;padding:12px 24px;text-decoration:none;">Open in Mavixy</a>
+    </div>` : '<div style="height:14px;"></div>'}
+  `
+  return layout(content, title || text)
+}

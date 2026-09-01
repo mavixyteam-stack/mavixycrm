@@ -18,6 +18,7 @@ export interface Profile {
   initials: string
   title: string
   permissions: string[]
+  telegram_chat_id?: string | null
   created_at: string
 }
 

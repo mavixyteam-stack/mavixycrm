@@ -79,6 +79,11 @@ export default function TopBar() {
   const notifications = state.notifications
   const unreadCount = notifications.filter(n => !n.read).length
 
+  // Telegram linking — only shown once a bot is configured
+  const tgBot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
+  const tgConnected = !!state.currentUser?.telegram_chat_id
+  const tgLink = tgBot && state.currentUser ? `https://t.me/${tgBot}?start=${state.currentUser.id}` : null
+
   function openNotif(n: typeof notifications[number]) {
     if (!n.read) markRead(n.id)
     if (n.link) dispatch({ type: 'SET_SCREEN', screen: n.link as Screen })
@@ -160,7 +165,7 @@ export default function TopBar() {
                 <button onClick={() => markAllRead()} style={{ fontSize:12, fontWeight:600, color:'var(--c-accent)', background:'none', border:'none', cursor:'pointer' }}>Mark all read</button>
               )}
             </div>
-            <div style={{ overflowY:'auto' }}>
+            <div style={{ overflowY:'auto', flex:1, minHeight:0 }}>
               {notifications.length === 0 ? (
                 <div style={{ padding:'40px 24px', textAlign:'center' }}>
                   <div style={{ fontSize:28, marginBottom:8 }}>🔔</div>
@@ -182,6 +187,20 @@ export default function TopBar() {
                 </div>
               ))}
             </div>
+            {tgLink && (
+              <div style={{ borderTop:'1px solid var(--c-border-soft)', padding:'11px 16px', flexShrink:0, background:'var(--c-fill-soft)' }}>
+                {tgConnected ? (
+                  <div style={{ fontSize:12, color:'var(--c-green)', fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+                    <span>✅</span> Telegram connected — alerts reach your phone
+                  </div>
+                ) : (
+                  <a href={tgLink} target="_blank" rel="noopener noreferrer"
+                    style={{ display:'flex', alignItems:'center', gap:8, fontSize:12.5, fontWeight:600, color:'#229ED9', textDecoration:'none' }}>
+                    <span style={{ fontSize:15 }}>✈️</span> Connect Telegram to get notified on your phone →
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div></ModalPortal>
       )}

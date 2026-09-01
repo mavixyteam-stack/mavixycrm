@@ -25,6 +25,8 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS target_audience TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS brand_voice TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS reference_links TEXT;
 
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
+
 -- Notifications (in-app notification center)
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
