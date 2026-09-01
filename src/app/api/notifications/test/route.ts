@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { adminClient, createNotifications } from '@/lib/notify'
 import { telegramConfigured } from '@/lib/telegram'
+import { sendEmail } from '@/lib/email'
 
 /**
  * Diagnostic: open /api/notifications/test in the browser while logged in.
@@ -78,6 +79,26 @@ export async function GET() {
       text: 'If you see this in Telegram or email, external delivery works.',
       type: 'info',
     })
+
+    // 6. Direct email test that SURFACES the Resend error instead of swallowing it
+    const emailTest: Record<string, unknown> = {
+      resendKeyPresent: !!process.env.RESEND_API_KEY,
+      from: process.env.RESEND_FROM ?? 'Mavixy <onboarding@resend.dev>',
+      to: me?.email ?? null,
+    }
+    if (me?.email && process.env.RESEND_API_KEY) {
+      try {
+        await sendEmail(me.email, 'Mavixy email test', '<p>If you got this, Mavixy email delivery works.</p>')
+        emailTest.sent = true
+      } catch (e) {
+        emailTest.sent = false
+        emailTest.error = e instanceof Error ? e.message : String(e)
+      }
+    } else {
+      emailTest.sent = false
+      emailTest.error = !process.env.RESEND_API_KEY ? 'RESEND_API_KEY is not set in the environment' : 'no email on profile'
+    }
+    result.emailTest = emailTest
 
     // Verdict
     const inserted = (steps.serviceInsert as { ok: boolean }).ok
