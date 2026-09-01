@@ -29,7 +29,7 @@ export async function createNotifications(
   const ids = Array.from(new Set(userIds.filter((x): x is string => !!x)))
   if (ids.length === 0) return 0
 
-  const rows = ids.map(user_id => ({
+  let rows: Record<string, unknown>[] = ids.map(user_id => ({
     user_id,
     title: n.title ?? null,
     text: n.text,
@@ -38,10 +38,19 @@ export async function createNotifications(
     read: false,
   }))
 
-  const { error, count } = await admin.from('notifications').insert(rows, { count: 'exact' })
-  if (error) {
+  // Retry loop: if a column is missing from the table, strip it and retry so
+  // a schema gap degrades (drops that field) instead of losing the notification.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { error } = await admin.from('notifications').insert(rows)
+    if (!error) return rows.length
+
+    const missing = error.message?.match(/Could not find the '(.+?)' column/)?.[1]
+    if (missing && missing !== 'text' && missing !== 'user_id') {
+      rows = rows.map(r => { const c = { ...r }; delete c[missing]; return c })
+      continue
+    }
     console.error('createNotifications:', error.message)
     return 0
   }
-  return count ?? rows.length
+  return 0
 }

@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, created_at DESC);
+-- Heal a pre-existing notifications table that lacks the newer columns
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'info';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS read BOOLEAN NOT NULL DEFAULT false;
 
 -- Row Level Security (allow all authenticated users to read/write)
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
