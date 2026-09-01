@@ -1,6 +1,6 @@
 'use client'
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client } from '@/types'
+import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client, Notification } from '@/types'
 import { createClient } from './supabase/client'
 import {
   loadWorkspace,
@@ -8,6 +8,7 @@ import {
   dbUpsertClient, dbDeleteClient,
   dbUpsertTask, dbUpsertDeal, dbDeleteDeal,
   dbUpsertAttendanceRequest, dbUpdateAttendanceRequest,
+  loadNotifications, markNotificationRead, markAllNotificationsRead, notifyUsers,
 } from './db'
 
 interface AppState {
@@ -22,6 +23,7 @@ interface AppState {
   attendance: AttendanceRecord[]
   attendanceRequests: AttendanceRequest[]
   deals: Deal[]
+  notifications: Notification[]
   selectedClientId: string | null
   toast: string | null
   briefOpen: boolean
@@ -58,6 +60,9 @@ type Action =
   | { type: 'UPSERT_DEAL'; deal: Deal }
   | { type: 'DELETE_DEAL'; id: string }
   | { type: 'SET_ATTENDANCE'; attendance: AttendanceRecord[] }
+  | { type: 'SET_NOTIFICATIONS'; notifications: Notification[] }
+  | { type: 'MARK_NOTIF_READ'; id: string }
+  | { type: 'MARK_ALL_NOTIF_READ' }
   | { type: 'UPSERT_ATT_REQUEST'; request: AttendanceRequest }
   | { type: 'UPDATE_ATT_REQUEST'; id: string; status: 'approved' | 'rejected'; reviewed_by: string; rejection_reason?: string }
   | { type: 'SHOW_TOAST'; msg: string }
@@ -86,6 +91,7 @@ const initial: AppState = {
   attendance: [],
   attendanceRequests: [],
   deals: [],
+  notifications: [],
   selectedClientId: null,
   toast: null,
   briefOpen: false,
@@ -142,6 +148,9 @@ function reducer(state: AppState, action: Action): AppState {
     case 'UPSERT_DEAL': return { ...state, deals: upsert(state.deals, action.deal) }
     case 'DELETE_DEAL': return { ...state, deals: state.deals.filter(x => x.id !== action.id) }
     case 'SET_ATTENDANCE': return { ...state, attendance: action.attendance }
+    case 'SET_NOTIFICATIONS': return { ...state, notifications: action.notifications }
+    case 'MARK_NOTIF_READ': return { ...state, notifications: state.notifications.map(n => n.id === action.id ? { ...n, read: true } : n) }
+    case 'MARK_ALL_NOTIF_READ': return { ...state, notifications: state.notifications.map(n => ({ ...n, read: true })) }
     case 'UPSERT_ATT_REQUEST': return { ...state, attendanceRequests: upsert(state.attendanceRequests, action.request) }
     case 'UPDATE_ATT_REQUEST': return {
       ...state,
@@ -181,6 +190,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (profile) dispatch({ type: 'SET_USER', user: profile })
         else dispatch({ type: 'AUTH_LOADED' })
         await fetchWorkspace(dispatch)
+        await fetchNotifications(session.user.id, dispatch)
         await restoreCheckIn(sb, session.user.id, dispatch)
       } else {
         dispatch({ type: 'AUTH_LOADED' })
@@ -194,11 +204,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
         if (profile) dispatch({ type: 'SET_USER', user: profile })
         await fetchWorkspace(dispatch)
+        await fetchNotifications(session.user.id, dispatch)
         await restoreCheckIn(sb, session.user.id, dispatch)
       }
     })
     return () => subscription.unsubscribe()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll notifications every 60s and refetch when the tab regains focus,
+  // so approvals and reminders show up without a manual refresh.
+  const userId = state.currentUser?.id
+  useEffect(() => {
+    if (!userId) return
+    const refresh = () => fetchNotifications(userId, dispatch)
+    const interval = setInterval(refresh, 60000)
+    const onFocus = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onFocus)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onFocus) }
+  }, [userId])
 
   return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>
 }
@@ -217,6 +240,15 @@ async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
     })
   } catch (e) {
     console.error('fetchWorkspace', e)
+  }
+}
+
+async function fetchNotifications(userId: string, dispatch: React.Dispatch<Action>) {
+  try {
+    const notifications = await loadNotifications(userId)
+    dispatch({ type: 'SET_NOTIFICATIONS', notifications })
+  } catch (e) {
+    console.error('fetchNotifications', e)
   }
 }
 
@@ -339,4 +371,29 @@ export function useUpdateAttendanceRequest() {
     dispatch({ type: 'UPDATE_ATT_REQUEST', id, status, reviewed_by, rejection_reason })
     await dbUpdateAttendanceRequest(id, status, reviewed_by, rejection_reason)
   }, [dispatch])
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export function useMarkNotifRead() {
+  const { dispatch } = useApp()
+  return useCallback((id: string) => {
+    dispatch({ type: 'MARK_NOTIF_READ', id })
+    markNotificationRead(id)
+  }, [dispatch])
+}
+
+export function useMarkAllNotifRead() {
+  const { dispatch } = useApp()
+  return useCallback(() => {
+    dispatch({ type: 'MARK_ALL_NOTIF_READ' })
+    markAllNotificationsRead()
+  }, [dispatch])
+}
+
+/** Send a notification to a set of users (fire-and-forget). */
+export function useNotify() {
+  return useCallback((userIds: string[], n: { title?: string; text: string; type?: string; link?: string }) => {
+    return notifyUsers(userIds, n)
+  }, [])
 }

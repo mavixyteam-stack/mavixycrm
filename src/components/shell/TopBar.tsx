@@ -1,9 +1,29 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { useApp, useToast } from '@/lib/store'
+import { useApp, useToast, useMarkNotifRead, useMarkAllNotifRead } from '@/lib/store'
 import { dbCheckIn, dbCheckOut } from '@/lib/db'
 import { Bell, Search, Check, X } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
+import type { Screen, NotificationType } from '@/types'
+
+const NOTIF_COLOR: Record<NotificationType, string> = {
+  success: '#0E8C63',
+  warning: '#E5484D',
+  reminder: '#FF5C1F',
+  request: '#7C5CFF',
+  info: '#2563EB',
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return days === 1 ? 'yesterday' : `${days}d ago`
+}
 
 export default function TopBar() {
   const { state, dispatch } = useApp()
@@ -54,7 +74,16 @@ export default function TopBar() {
     }
   }
 
-  const notifCount = 3
+  const markRead = useMarkNotifRead()
+  const markAllRead = useMarkAllNotifRead()
+  const notifications = state.notifications
+  const unreadCount = notifications.filter(n => !n.read).length
+
+  function openNotif(n: typeof notifications[number]) {
+    if (!n.read) markRead(n.id)
+    if (n.link) dispatch({ type: 'SET_SCREEN', screen: n.link as Screen })
+    dispatch({ type: 'TOGGLE_NOTIF' })
+  }
 
   return (
     <>
@@ -110,8 +139,10 @@ export default function TopBar() {
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='var(--c-fill)'}
         >
           <Bell size={17} color="var(--c-subtle)" />
-          {notifCount > 0 && (
-            <div style={{ position:'absolute', top:7, right:7, width:7, height:7, borderRadius:'50%', background:'#FF5C1F', border:'2px solid #fff' }} />
+          {unreadCount > 0 && (
+            <div style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, padding:'0 4px', borderRadius:8, background:'#FF5C1F', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9.5, fontWeight:800, color:'#fff', fontFamily:'var(--font-display)' }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </div>
           )}
         </button>
 
@@ -120,27 +151,37 @@ export default function TopBar() {
       {/* Notifications panel */}
       {state.notifOpen && (
         <ModalPortal><div onClick={() => dispatch({ type:'TOGGLE_NOTIF' })} style={{ position:'fixed', inset:0, zIndex:100 }}>
-          <div onClick={e => e.stopPropagation()} style={{ position:'absolute', top:66, right:20, width:340, background:'#fff', borderRadius:16, border:'1px solid var(--c-border)', boxShadow:'0 20px 40px -15px rgba(0,0,0,.18)', overflow:'hidden', animation:'popIn .2s ease both' }}>
-            <div style={{ padding:'14px 16px 10px', borderBottom:'1px solid var(--c-border-soft)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15 }}>Notifications</span>
-              <button style={{ fontSize:12, fontWeight:600, color:'var(--c-accent)' }}>Mark all read</button>
+          <div onClick={e => e.stopPropagation()} style={{ position:'absolute', top:66, right:20, width:360, maxHeight:'70vh', display:'flex', flexDirection:'column', background:'#fff', borderRadius:16, border:'1px solid var(--c-border)', boxShadow:'0 20px 40px -15px rgba(0,0,0,.18)', overflow:'hidden', animation:'popIn .2s ease both' }}>
+            <div style={{ padding:'14px 16px 12px', borderBottom:'1px solid var(--c-border-soft)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+              <span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15 }}>
+                Notifications{unreadCount > 0 && <span style={{ color:'var(--c-faint)', fontWeight:600 }}> · {unreadCount} new</span>}
+              </span>
+              {unreadCount > 0 && (
+                <button onClick={() => markAllRead()} style={{ fontSize:12, fontWeight:600, color:'var(--c-accent)', background:'none', border:'none', cursor:'pointer' }}>Mark all read</button>
+              )}
             </div>
-            {[
-              { color:'#FF5C38', text:'Weekend Doors waiting on your reel cover approval', time:'2h overdue' },
-              { color:'#F4B740', text:'Dev left a comment on the SUNSO carousel brief', time:'18 min ago' },
-              { color:'#FF5C1F', text:'Lumio Diwali references added to the asset bank', time:'1h ago' },
-            ].map((n, i) => (
-              <div key={i} style={{ display:'flex', gap:11, padding:'12px 16px', borderBottom:'1px solid var(--c-border-soft)', cursor:'pointer', transition:'background .15s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--c-fill)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}
-              >
-                <div style={{ width:8, height:8, borderRadius:'50%', background:n.color, marginTop:5, flexShrink:0 }} />
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13.5, fontWeight:500, lineHeight:1.4 }}>{n.text}</div>
-                  <div style={{ fontSize:12, color:'var(--c-faint)', marginTop:2 }}>{n.time}</div>
+            <div style={{ overflowY:'auto' }}>
+              {notifications.length === 0 ? (
+                <div style={{ padding:'40px 24px', textAlign:'center' }}>
+                  <div style={{ fontSize:28, marginBottom:8 }}>🔔</div>
+                  <div style={{ fontSize:13.5, fontWeight:600, color:'var(--c-ink)', marginBottom:3 }}>You're all caught up</div>
+                  <div style={{ fontSize:12.5, color:'var(--c-faint)' }}>New updates and reminders will show up here.</div>
                 </div>
-              </div>
-            ))}
+              ) : notifications.map(n => (
+                <div key={n.id} onClick={() => openNotif(n)}
+                  style={{ display:'flex', gap:11, padding:'12px 16px', borderBottom:'1px solid var(--c-border-soft)', cursor:'pointer', transition:'background .15s', background: n.read ? 'transparent' : 'var(--c-accent-bg)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = n.read ? 'var(--c-fill)' : 'var(--c-accent-bg)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = n.read ? 'transparent' : 'var(--c-accent-bg)'}
+                >
+                  <div style={{ width:8, height:8, borderRadius:'50%', background: n.read ? 'var(--c-ghost)' : (NOTIF_COLOR[n.type] || '#FF5C1F'), marginTop:5, flexShrink:0 }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    {n.title && <div style={{ fontSize:13, fontWeight:700, lineHeight:1.35, marginBottom:1 }}>{n.title}</div>}
+                    <div style={{ fontSize:13, fontWeight: n.title ? 400 : 500, color: n.title ? 'var(--c-subtle)' : 'var(--c-ink)', lineHeight:1.45 }}>{n.text}</div>
+                    <div style={{ fontSize:11.5, color:'var(--c-faint)', marginTop:3 }}>{timeAgo(n.created_at)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div></ModalPortal>
       )}

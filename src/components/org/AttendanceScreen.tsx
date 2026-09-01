@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useApp, useToast, useUpsertAttendanceRequest, useUpdateAttendanceRequest } from '@/lib/store'
+import { useApp, useToast, useUpsertAttendanceRequest, useUpdateAttendanceRequest, useNotify } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { Check, X, Plus, ChevronLeft, ChevronRight } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
@@ -72,9 +72,14 @@ export default function AttendanceScreen() {
   const toast = useToast()
   const upsertRequest = useUpsertAttendanceRequest()
   const updateRequest = useUpdateAttendanceRequest()
+  const notify = useNotify()
 
   const role = state.currentUser?.role || 'employee'
   const isOwner = role === 'owner' || role === 'manager'
+
+  // Owners/managers who should be alerted when a request comes in
+  const approverIds = state.users.filter(u => ['owner', 'manager'].includes(u.role)).map(u => u.id)
+  const myFirstName = state.currentUser?.name?.split(' ')[0] || 'A team member'
 
   // View state
   const [tab, setTab] = useState<'calendar' | 'requests'>('calendar')
@@ -84,6 +89,7 @@ export default function AttendanceScreen() {
   // Month data
   const [monthRecords, setMonthRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(false)
+  const [reviewTick, setReviewTick] = useState(0)  // bumped after an approval applies a correction
 
   // Modals
   const [dayModal, setDayModal] = useState<DayModalState | null>(null)
@@ -122,7 +128,7 @@ export default function AttendanceScreen() {
         setMonthRecords(error ? [] : (data || []))
         setLoading(false)
       })
-  }, [viewUserId, year, month, state.checkedIn]) // refetch on check-in/out
+  }, [viewUserId, year, month, state.checkedIn, reviewTick]) // refetch on check-in/out and after a review applies changes
 
   // Init viewUserId when currentUser loads
   useEffect(() => {
@@ -204,6 +210,12 @@ export default function AttendanceScreen() {
       created_at: new Date().toISOString(),
     }
     upsertRequest(req)
+    notify(approverIds, {
+      title: 'Time correction request',
+      text: `${myFirstName} requested a time correction for ${req.date}.`,
+      type: 'request',
+      link: 'attendance',
+    })
     setCorrModal(null)
     setCorrForm({ checkIn: '09:00', checkOut: '18:00', reason: '' })
     toast('Correction request submitted — awaiting approval')
@@ -225,16 +237,28 @@ export default function AttendanceScreen() {
       created_at: new Date().toISOString(),
     }
     upsertRequest(req)
+    const range = req.leave_end && req.leave_end !== req.date ? `${req.date} → ${req.leave_end}` : req.date
+    notify(approverIds, {
+      title: `${LEAVE_LABELS[leaveForm.type]} request`,
+      text: `${myFirstName} applied for ${LEAVE_LABELS[leaveForm.type].toLowerCase()} (${range}).`,
+      type: 'request',
+      link: 'attendance',
+    })
     setLeaveModal(false)
     setLeaveForm({ type: 'casual', start: '', end: '', reason: '' })
     toast(`${LEAVE_LABELS[leaveForm.type]} request submitted`)
   }
 
   // ── Approve / Reject ─────────────────────────────────────────────────────────
-  function approveRequest(id: string, req: AttendanceRequest) {
-    updateRequest(id, 'approved', state.currentUser!.id)
+  async function approveRequest(id: string, req: AttendanceRequest) {
     const user = state.users.find(u => u.id === req.user_id)
-    toast(`Approved — ${user?.name.split(' ')[0] || 'Employee'} notified`)
+    try {
+      await updateRequest(id, 'approved', state.currentUser!.id)
+      setReviewTick(t => t + 1) // refetch so an applied correction shows immediately
+      toast(`Approved — ${user?.name.split(' ')[0] || 'Employee'} notified`)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Approval failed')
+    }
   }
 
   function openReject(id: string, req: AttendanceRequest) {
@@ -243,11 +267,16 @@ export default function AttendanceScreen() {
     setRejectReason('')
   }
 
-  function confirmReject() {
+  async function confirmReject() {
     if (!rejectModal) return
-    updateRequest(rejectModal.id, 'rejected', state.currentUser!.id, rejectReason)
-    toast(`Rejected — ${rejectModal.userName} notified`)
+    const { id, userName } = rejectModal
     setRejectModal(null)
+    try {
+      await updateRequest(id, 'rejected', state.currentUser!.id, rejectReason)
+      toast(`Rejected — ${userName} notified`)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Rejection failed')
+    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────

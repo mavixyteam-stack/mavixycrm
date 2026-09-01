@@ -133,11 +133,15 @@ export interface Deal {
   color?: string
 }
 
+export type NotificationType = 'warning' | 'info' | 'success' | 'reminder' | 'request'
+
 export interface Notification {
   id: string
   user_id: string
+  title?: string | null
   text: string
-  type: 'warning' | 'info' | 'success'
+  type: NotificationType
+  link?: string | null       // screen to open when clicked, e.g. 'attendance'
   read: boolean
   created_at: string
 }

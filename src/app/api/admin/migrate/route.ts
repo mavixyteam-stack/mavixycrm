@@ -25,6 +25,19 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS target_audience TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS brand_voice TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS reference_links TEXT;
 
+-- Notifications (in-app notification center)
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  title TEXT,
+  text TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'info',
+  link TEXT,
+  read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, created_at DESC);
+
 -- Row Level Security (allow all authenticated users to read/write)
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
@@ -33,6 +46,7 @@ ALTER TABLE plan_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "mavixy_deals" ON deals;
 CREATE POLICY "mavixy_deals" ON deals FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -47,7 +61,9 @@ CREATE POLICY "mavixy_attendance" ON attendance FOR ALL TO authenticated USING (
 DROP POLICY IF EXISTS "mavixy_att_req" ON attendance_requests;
 CREATE POLICY "mavixy_att_req" ON attendance_requests FOR ALL TO authenticated USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "mavixy_profiles" ON profiles;
-CREATE POLICY "mavixy_profiles" ON profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+CREATE POLICY "mavixy_profiles" ON profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "mavixy_notifications" ON notifications;
+CREATE POLICY "mavixy_notifications" ON notifications FOR ALL TO authenticated USING (true) WITH CHECK (true);`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

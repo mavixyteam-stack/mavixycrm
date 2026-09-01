@@ -219,23 +219,59 @@ export async function dbUpsertAttendanceRequest(req: AttendanceRequest) {
 export async function dbUpdateAttendanceRequest(
   id: string,
   status: 'approved' | 'rejected',
-  reviewed_by: string,
+  _reviewed_by: string,
   rejection_reason?: string,
 ) {
-  const sb = createClient()
-  const { data: existing } = await sb
-    .from('attendance_requests')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
-
-  if (existing) {
-    await apiUpsert('attendance_requests', {
-      ...existing,
-      status,
-      reviewed_by,
-      reviewed_at: new Date().toISOString(),
-      rejection_reason: rejection_reason || null,
-    })
+  // Routed server-side: applies approved corrections to the attendance
+  // record and notifies the employee, all with the service role.
+  const res = await fetch('/api/attendance/review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestId: id, decision: status, rejectionReason: rejection_reason }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(body.error || 'Review failed')
   }
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export async function loadNotifications(userId: string) {
+  const sb = createClient()
+  const { data } = await sb
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return data || []
+}
+
+export async function notifyUsers(
+  userIds: string[],
+  n: { title?: string; text: string; type?: string; link?: string },
+) {
+  if (userIds.length === 0) return
+  await fetch('/api/notifications/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_ids: userIds, ...n }),
+  }).catch(() => {}) // notifications are best-effort; never block the action
+}
+
+export async function markNotificationRead(id: string) {
+  await fetch('/api/notifications/read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).catch(() => {})
+}
+
+export async function markAllNotificationsRead() {
+  await fetch('/api/notifications/read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ all: true }),
+  }).catch(() => {})
 }
