@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Only owners or managers can finish onboarding' }, { status: 403 })
   }
 
-  const { token, m365_email, m365_password } = await req.json()
+  const { token, m365_email, m365_password, buddy_id } = await req.json()
   if (!token || !m365_email || !m365_password) {
     return NextResponse.json({ error: 'token, m365_email and m365_password are required' }, { status: 400 })
   }
@@ -68,18 +68,25 @@ export async function POST(req: NextRequest) {
   await admin.from('onboarding_invites').update({
     status: 'completed',
     m365_email,
+    buddy_id: buddy_id || null,
     created_profile_id: newUserId,
     completed_at: new Date().toISOString(),
   }).eq('id', invite.id)
 
   // 4. Welcome email to the candidate's personal email
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+  let buddy: { name: string; email?: string | null } | null = null
+  if (buddy_id) {
+    const { data: b } = await admin.from('profiles').select('name, email').eq('id', buddy_id).maybeSingle()
+    if (b) buddy = { name: b.name, email: b.email }
+  }
   if (invite.personal_email) {
     const html = buildWelcomeEmail({
       name,
       workEmail: m365_email,
       password: m365_password,
       appUrl,
+      buddy,
     })
     try { await sendEmail(invite.personal_email, 'Welcome to Mavixy — your account is ready 🎉', html) }
     catch (e) { console.error('welcome email:', e) }

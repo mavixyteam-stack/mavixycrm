@@ -320,15 +320,45 @@ export function buildNotificationEmail(opts: {
   return layout(content, title || text)
 }
 
+// ─── Onboarding invite ────────────────────────────────────────────────────────
+
+export function buildOnboardingInviteEmail(opts: {
+  link: string
+  role?: string | null
+  department?: string | null
+}) {
+  const { link, role, department } = opts
+  const roleLine = [department, role].filter(Boolean).join(' · ')
+
+  const content = `
+    ${header('YOU\'RE INVITED', 'Welcome to Mavixy — let\'s get you set up', '#FF5C1F')}
+    <div style="padding:24px 28px 8px;font-size:15px;line-height:1.65;color:#3A3E33;">
+      Congratulations and welcome aboard! ${roleLine ? `We're excited to have you join us${department ? ` in <strong>${department}</strong>` : ''}${role ? ` as ${role}` : ''}. ` : ''}
+      To finish setting up your employment, please fill in a few details — it takes about 3 minutes.
+    </div>
+    <div style="padding:14px 28px 8px;">
+      <a href="${link}" style="display:inline-block;background:#FF5C1F;color:#fff;font-size:14px;font-weight:700;border-radius:11px;padding:13px 26px;text-decoration:none;">Fill in my details →</a>
+    </div>
+    <div style="padding:6px 28px 26px;font-size:12.5px;color:#9A9E94;line-height:1.6;">
+      Or paste this link into your browser:<br>
+      <span style="color:#5A5E54;word-break:break-all;">${link}</span>
+    </div>
+  `
+  return layout(content, 'You\'re invited to join Mavixy — fill in your onboarding details')
+}
+
 // ─── Onboarding welcome ───────────────────────────────────────────────────────
+
+const M365_LOGIN_URL = 'https://www.office.com/login'
 
 export function buildWelcomeEmail(opts: {
   name: string
   workEmail: string
   password: string
   appUrl: string
+  buddy?: { name: string; email?: string | null } | null
 }) {
-  const { name, workEmail, password, appUrl } = opts
+  const { name, workEmail, password, appUrl, buddy } = opts
   const first = name.split(' ')[0] || name
 
   const cred = (label: string, value: string) => `
@@ -336,6 +366,15 @@ export function buildWelcomeEmail(opts: {
       <td style="padding:10px 0;font-size:13px;color:#9A9E94;width:130px;">${label}</td>
       <td style="padding:10px 0;font-size:14px;font-weight:700;color:#0E0F0C;font-family:'SF Mono',Menlo,monospace;">${value}</td>
     </tr>`
+
+  const buddyBlock = buddy ? `
+    <div style="margin:4px 28px 12px;background:#F3EEFE;border-radius:14px;padding:16px 20px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#7C3AED;text-transform:uppercase;margin-bottom:6px;">Your onboarding buddy</div>
+      <div style="font-size:15px;font-weight:700;color:#0E0F0C;">${buddy.name}</div>
+      <div style="font-size:13.5px;color:#5A5E54;margin-top:2px;">
+        Reach out to ${buddy.name.split(' ')[0]} anytime you need help settling in${buddy.email ? ` — <a href="mailto:${buddy.email}" style="color:#7C3AED;">${buddy.email}</a>` : ''}.
+      </div>
+    </div>` : ''
 
   const content = `
     ${header('WELCOME ABOARD', `Welcome to the team, ${first} 🎉`, '#0E8C63')}
@@ -357,9 +396,13 @@ export function buildWelcomeEmail(opts: {
     <div style="padding:8px 28px 4px;font-size:14px;line-height:1.6;color:#5A5E54;">
       Use the same email and password for both <strong>Microsoft 365</strong> and <strong>Mavixy OS</strong>.
     </div>
-    <div style="padding:12px 28px 26px;">
-      <a href="${appUrl}" style="display:inline-block;background:#FF5C1F;color:#fff;font-size:14px;font-weight:700;border-radius:11px;padding:13px 26px;text-decoration:none;">Sign in to Mavixy OS →</a>
+    <div style="padding:12px 28px 20px;">
+      <a href="${M365_LOGIN_URL}" style="display:inline-block;background:#0F172A;color:#fff;font-size:14px;font-weight:700;border-radius:11px;padding:13px 24px;text-decoration:none;margin-right:8px;">Sign in to Microsoft 365 →</a>
+      <a href="${appUrl}" style="display:inline-block;background:#FF5C1F;color:#fff;font-size:14px;font-weight:700;border-radius:11px;padding:13px 24px;text-decoration:none;">Open Mavixy OS →</a>
     </div>
+
+    ${buddyBlock}
+    <div style="height:14px;"></div>
   `
   return layout(content, `Welcome to Mavixy, ${first} — your account is ready`)
 }

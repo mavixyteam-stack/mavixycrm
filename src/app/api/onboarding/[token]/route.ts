@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
 
   const { data, error } = await admin
     .from('onboarding_invites')
-    .select('token, role, title, status, full_name')
+    .select('token, role, title, department, status, full_name, personal_email')
     .eq('token', token)
     .maybeSingle()
 
@@ -20,7 +20,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
     token: data.token,
     role: data.role,
     title: data.title,
+    department: data.department,
     status: data.status,
     full_name: data.full_name,
+    personal_email: data.personal_email,
   })
 }

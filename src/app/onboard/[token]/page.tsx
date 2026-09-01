@@ -28,6 +28,7 @@ export default function OnboardPage() {
   const [status, setStatus] = useState<Status>('loading')
   const [role, setRole] = useState('')
   const [title, setTitle] = useState('')
+  const [department, setDepartment] = useState('')
 
   const [f, setF] = useState({
     full_name: '', personal_email: '', phone: '', emergency_phone: '',
@@ -48,7 +49,8 @@ export default function OnboardPage() {
     fetch(`/api/onboarding/${token}`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
-        setRole(d.role); setTitle(d.title || '')
+        setRole(d.role); setTitle(d.title || ''); setDepartment(d.department || '')
+        if (d.personal_email) setF(prev => ({ ...prev, personal_email: d.personal_email }))
         setStatus(d.status === 'pending' ? 'pending' : d.status === 'submitted' ? 'submitted' : 'completed')
       })
       .catch(() => setStatus('notfound'))
@@ -156,7 +158,7 @@ export default function OnboardPage() {
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 6 }}>Welcome aboard 👋</h1>
         <p style={{ fontSize: 14.5, color: 'var(--c-subtle)', lineHeight: 1.6 }}>
-          Fill in your details to get set up{title ? ` as ${title}` : role ? ` (${role})` : ''}. It takes about 3 minutes. Everything is kept private and used only for your employment records.
+          Fill in your details to get set up{department ? ` in ${department}` : ''}{title ? ` as ${title}` : role ? ` (${role})` : ''}. It takes about 3 minutes. Everything is kept private and used only for your employment records.
         </p>
       </div>
 

@@ -5,13 +5,13 @@ import { Plus, X, Check } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
 interface Invite {
-  id: string; token: string; role: string; title: string | null; status: string
+  id: string; token: string; role: string; title: string | null; department: string | null; status: string
   work_email: string | null; full_name: string | null; personal_email: string | null
   phone: string | null; emergency_phone: string | null
   aadhar_number: string | null; pan_number: string | null
   aadhar_url: string | null; pan_url: string | null
   bank_account_number: string | null; bank_ifsc: string | null; bank_name: string | null; bank_branch: string | null
-  m365_email: string | null; submitted_at: string | null; completed_at: string | null; created_at: string
+  m365_email: string | null; buddy_id: string | null; submitted_at: string | null; completed_at: string | null; created_at: string
 }
 
 const STATUS_STYLE: Record<string, { label: string; c: string; bg: string }> = {
@@ -34,7 +34,7 @@ export default function OnboardingScreen() {
   const [invites, setInvites] = useState<Invite[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ role: 'employee', title: '' })
+  const [form, setForm] = useState({ personal_email: '', role: 'employee', department: '' })
   const [creating, setCreating] = useState(false)
   const [newLink, setNewLink] = useState<string | null>(null)
   const [detail, setDetail] = useState<Invite | null>(null)
@@ -81,7 +81,7 @@ export default function OnboardingScreen() {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>Onboarding</h1>
           <p style={{ fontSize: 14, color: 'var(--c-subtle)' }}>Invite a new hire, collect their details, and set up their accounts.</p>
         </div>
-        <button onClick={() => { setForm({ role: 'employee', title: '' }); setNewLink(null); setCreateOpen(true) }}
+        <button onClick={() => { setForm({ personal_email: '', role: 'employee', department: '' }); setNewLink(null); setCreateOpen(true) }}
           style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--c-accent)', color: '#fff', borderRadius: 10, padding: '10px 16px', fontWeight: 700, fontSize: 13.5, border: 'none', cursor: 'pointer' }}>
           <Plus size={14} color="#fff" />New onboarding
         </button>
@@ -150,6 +150,12 @@ export default function OnboardingScreen() {
             {!newLink ? (
               <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 6 }}>Candidate's personal email <span style={{ color: '#EF4444' }}>*</span></label>
+                  <input type="email" value={form.personal_email} onChange={e => setForm(f => ({ ...f, personal_email: e.target.value }))} placeholder="newhire@gmail.com"
+                    style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 4 }}>The onboarding link is emailed here automatically.</div>
+                </div>
+                <div>
                   <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 8 }}>Role</label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {ROLES.map(r => (
@@ -159,13 +165,13 @@ export default function OnboardingScreen() {
                   </div>
                 </div>
                 <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 6 }}>Job title (optional)</label>
-                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Content Designer"
+                  <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 6 }}>Department</label>
+                  <input value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} placeholder="e.g. Social Media, Performance, Design"
                     style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
                 </div>
-                <button onClick={createInvite} disabled={creating}
-                  style={{ padding: '12px', borderRadius: 11, background: 'var(--c-ink)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: creating ? .6 : 1 }}>
-                  {creating ? 'Creating…' : 'Generate onboarding link'}
+                <button onClick={createInvite} disabled={creating || !form.personal_email.trim()}
+                  style={{ padding: '12px', borderRadius: 11, background: 'var(--c-ink)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: creating || !form.personal_email.trim() ? 'default' : 'pointer', opacity: creating || !form.personal_email.trim() ? .6 : 1 }}>
+                  {creating ? 'Sending invite…' : 'Send onboarding invite'}
                 </button>
               </div>
             ) : (
@@ -173,8 +179,8 @@ export default function OnboardingScreen() {
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--c-green-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                   <Check size={22} color="var(--c-green)" />
                 </div>
-                <div style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 6 }}>Link ready — send it to your new hire</div>
-                <div style={{ fontSize: 13, color: 'var(--c-subtle)', marginBottom: 16 }}>They fill their details, then you'll be notified to set up their accounts.</div>
+                <div style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 6 }}>Invite sent 🎉</div>
+                <div style={{ fontSize: 13, color: 'var(--c-subtle)', marginBottom: 16 }}>We emailed the onboarding link to the candidate. You can also share it directly below.</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input readOnly value={newLink} style={{ flex: 1, border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, background: 'var(--c-fill)', boxSizing: 'border-box' }} />
                   <button onClick={() => { navigator.clipboard?.writeText(newLink); toast('Link copied') }}
@@ -202,10 +208,13 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 function DetailModal({ invite, onClose, onDone, toast }: { invite: Invite; onClose: () => void; onDone: () => void; toast: (m: string) => void }) {
+  const { state } = useApp()
   const [m365Email, setM365Email] = useState(invite.work_email || '')
   const [password, setPassword] = useState('')
+  const [buddyId, setBuddyId] = useState(invite.buddy_id || '')
   const [saving, setSaving] = useState(false)
   const done = invite.status === 'completed'
+  const buddy = state.users.find(u => u.id === invite.buddy_id)
 
   async function complete() {
     if (!m365Email || password.length < 8) { toast('Enter the work email and a password (8+ chars)'); return }
@@ -213,7 +222,7 @@ function DetailModal({ invite, onClose, onDone, toast }: { invite: Invite; onClo
     try {
       const res = await fetch('/api/onboarding/complete', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: invite.token, m365_email: m365Email, m365_password: password }),
+        body: JSON.stringify({ token: invite.token, m365_email: m365Email, m365_password: password, buddy_id: buddyId || null }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
@@ -254,7 +263,7 @@ function DetailModal({ invite, onClose, onDone, toast }: { invite: Invite; onClo
           {done ? (
             <div style={{ marginTop: 18, background: 'var(--c-green-bg)', border: '1px solid var(--c-green-border)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--c-green)', marginBottom: 3 }}>✓ Onboarded</div>
-              <div style={{ fontSize: 12.5, color: 'var(--c-green)' }}>Account: {invite.m365_email} · welcome email sent to {invite.personal_email}</div>
+              <div style={{ fontSize: 12.5, color: 'var(--c-green)' }}>Account: {invite.m365_email} · welcome email sent to {invite.personal_email}{buddy ? ` · buddy: ${buddy.name}` : ''}</div>
             </div>
           ) : (
             <div style={{ marginTop: 18, background: 'var(--c-fill)', borderRadius: 12, padding: '16px' }}>
@@ -265,7 +274,13 @@ function DetailModal({ invite, onClose, onDone, toast }: { invite: Invite; onClo
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Work email (M365 ID)</label>
               <input value={m365Email} onChange={e => setM365Email(e.target.value)} style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }} />
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Temporary password</label>
-              <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
+              <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }} />
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Onboarding buddy</label>
+              <select value={buddyId} onChange={e => setBuddyId(e.target.value)}
+                style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', background: '#fff', cursor: 'pointer' }}>
+                <option value="">No buddy</option>
+                {state.users.map(u => <option key={u.id} value={u.id}>{u.name}{u.title ? ` · ${u.title}` : ''}</option>)}
+              </select>
               <button onClick={complete} disabled={saving}
                 style={{ width: '100%', marginTop: 14, padding: '12px', borderRadius: 11, background: 'var(--c-accent)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: saving ? .6 : 1 }}>
                 {saving ? 'Setting up…' : 'Create account & send welcome email'}

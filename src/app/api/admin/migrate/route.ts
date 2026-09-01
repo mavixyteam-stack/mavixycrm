@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS onboarding_invites (
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE onboarding_invites ADD COLUMN IF NOT EXISTS department TEXT;
+ALTER TABLE onboarding_invites ADD COLUMN IF NOT EXISTS buddy_id UUID;
+
 -- Sensitive PII (Aadhaar/PAN/bank): RLS on with NO permissive policy, so
 -- regular clients can't read it. All access goes through owner-checked,
 -- service-role server routes.

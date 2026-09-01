@@ -46,9 +46,11 @@ export interface OnboardingInvite {
   token: string
   role: string
   title: string | null
+  department: string | null
   work_email: string | null
   status: OnboardingStatus
   created_by: string | null
+  buddy_id: string | null
   full_name: string | null
   personal_email: string | null
   phone: string | null
