@@ -50,14 +50,14 @@ const AUTOMATIONS: Automation[] = [
     endpoint: '/api/automations/weekly-digest',
   },
   {
-    id: 'overdue-ops',
-    name: 'Overdue Content Alert',
-    description: 'Monitors for content items that have passed their scheduled day without being published, and alerts the team to take action.',
-    trigger: 'Daily at 10:00 AM',
-    action: 'Email to account managers',
-    recipients: 'Manager, Owner',
-    schedule: 'Daily, 10:00 AM',
-    endpoint: '/api/automations/weekly-digest',
+    id: 'reminders',
+    name: 'Task & Deadline Reminders',
+    description: 'Scans every open task and content item for its due date and sends each person a daily reminder — due tomorrow, due today, or overdue. Overdue work escalates to owners in-app and by email.',
+    trigger: 'Every morning at 8:00 AM',
+    action: 'In-app notification + email escalation',
+    recipients: 'Each assignee · owners on overdue',
+    schedule: 'Daily, 8:00 AM',
+    endpoint: '/api/automations/reminders',
   },
 ]
 
