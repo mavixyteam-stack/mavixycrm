@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useApp, useToast } from '@/lib/store'
+import { useApp, useToast, useUpsertTask } from '@/lib/store'
 import { Sparkle, ArrowRight, Plus, X, Check } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
@@ -9,6 +9,7 @@ const CAPACITY_MAX = 8
 export default function MyDay() {
   const { state, dispatch } = useApp()
   const toast = useToast()
+  const upsertTask = useUpsertTask()
   const role = state.currentUser?.role || 'employee'
   const name = state.currentUser?.name?.split(' ')[0] || 'there'
   const [done, setDone] = useState<Record<string, boolean>>({})
@@ -28,18 +29,16 @@ export default function MyDay() {
 
   function createTask() {
     if (!nw.title.trim()) return
-    dispatch({
-      type: 'UPSERT_TASK', task: {
-        id: crypto.randomUUID(),
-        title: nw.title,
-        client_id: nw.clientId,
-        type: nw.type,
-        assignee_id: state.currentUser?.id || '',
-        due: 'Today',
-        priority: nw.priority,
-        done: false,
-        created_at: new Date().toISOString(),
-      }
+    upsertTask({
+      id: crypto.randomUUID(),
+      title: nw.title,
+      client_id: nw.clientId,
+      type: nw.type,
+      assignee_id: state.currentUser?.id || '',
+      due: 'Today',
+      priority: nw.priority,
+      done: false,
+      created_at: new Date().toISOString(),
     })
     toast('Task created')
     setCreateOpen(false)

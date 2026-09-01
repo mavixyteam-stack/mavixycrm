@@ -63,7 +63,18 @@ CREATE POLICY "mavixy_att_req" ON attendance_requests FOR ALL TO authenticated U
 DROP POLICY IF EXISTS "mavixy_profiles" ON profiles;
 CREATE POLICY "mavixy_profiles" ON profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "mavixy_notifications" ON notifications;
-CREATE POLICY "mavixy_notifications" ON notifications FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+CREATE POLICY "mavixy_notifications" ON notifications FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Enable Realtime for instant notification delivery (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'notifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+  END IF;
+END $$;`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
