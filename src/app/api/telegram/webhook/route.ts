@@ -22,8 +22,12 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await admin.from('profiles').select('id, name').eq('id', userId).maybeSingle()
 
     if (profile) {
-      await admin.from('profiles').update({ telegram_chat_id: String(chatId) }).eq('id', userId)
-      await sendTelegram(chatId, `✅ Connected to Mavixy, ${profile.name?.split(' ')[0] || 'there'}! You'll get your notifications here from now on.`)
+      const { error: saveErr } = await admin.from('profiles').update({ telegram_chat_id: String(chatId) }).eq('id', userId)
+      if (saveErr) {
+        await sendTelegram(chatId, `⚠️ Couldn't finish linking: ${saveErr.message}. Ask your admin to run the telegram_chat_id migration, then tap the Connect link again.`)
+      } else {
+        await sendTelegram(chatId, `✅ Connected to Mavixy, ${profile.name?.split(' ')[0] || 'there'}! You'll get your notifications here from now on.`)
+      }
     } else {
       await sendTelegram(chatId, `Hmm, I couldn't match that link to a Mavixy account. Try the "Connect Telegram" button in the app again.`)
     }
