@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { adminClient } from '@/lib/notify'
+import { adminClient, createNotifications } from '@/lib/notify'
+import { telegramConfigured } from '@/lib/telegram'
 
 /**
  * Diagnostic: open /api/notifications/test in the browser while logged in.
@@ -47,6 +48,26 @@ export async function GET() {
     // 4. Read again as the user (RLS) — should now see the inserted row
     const r4 = await sb.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(3)
     steps.rlsReadAfter = { ok: !r4.error, error: r4.error?.message, count: r4.data?.length ?? 0, newest: r4.data?.[0] ?? null }
+
+    // 5. Telegram/email status for THIS user, and fire a full-pipeline test
+    const { data: me } = await admin.from('profiles').select('telegram_chat_id, email, name').eq('id', user.id).maybeSingle()
+    const linked = !!me?.telegram_chat_id
+    steps.channels = {
+      telegramBotConfigured: telegramConfigured(),
+      yourTelegramLinked: linked,
+      yourEmail: me?.email ?? null,
+      note: linked
+        ? 'Telegram is linked — a test message should arrive in your Telegram now.'
+        : (telegramConfigured()
+          ? 'Your account is NOT linked to Telegram yet. Open the app → bell → Connect Telegram → tap Start.'
+          : 'TELEGRAM_BOT_TOKEN is not set in the environment.'),
+    }
+    // This goes through the real pipeline, so it also sends Telegram + email if configured.
+    await createNotifications(admin, [user.id], {
+      title: 'Diagnostic ping',
+      text: 'If you see this in Telegram or email, external delivery works.',
+      type: 'info',
+    })
 
     // Verdict
     const inserted = (steps.serviceInsert as { ok: boolean }).ok
