@@ -115,7 +115,7 @@ const ROLE_SCREENS: Record<Role, Screen[]> = {
     'myday','clients','client-detail','reports','pipeline','leads','attendance',
   ],
   employee: [
-    'myday','planner','calendar','contentplan','knowledge','attendance',
+    'myday','calendar','contentplan','knowledge','attendance',
   ],
 }
 

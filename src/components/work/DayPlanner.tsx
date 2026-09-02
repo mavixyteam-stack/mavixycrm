@@ -5,6 +5,11 @@ import { Sparkle, Spinner, Warning } from '@/components/ui/Icon'
 
 const EFFORT_MINS = [0, 30, 60, 120, 180, 240] // index = effort level 1-5
 
+// Visibility hierarchy: you can see people strictly below your rank, plus
+// yourself. Owner sees everyone; a manager sees their reports but not the
+// owner (or peer managers).
+const RANK: Record<string, number> = { owner: 4, manager: 3, sales: 2, employee: 1 }
+
 function toTimeStr(offsetMins: number) {
   const total = 9 * 60 + offsetMins
   const h = Math.floor(total / 60)
@@ -33,14 +38,18 @@ export default function DayPlanner() {
   const dayLabel = today.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }).replace(' at', ',')
 
   const teamData = useMemo(() => {
-    return state.users.map(u => {
-      const taskCount = state.tasks.filter((t: { assignee_id: string; done: boolean }) => t.assignee_id === u.id && !t.done).length
-      const itemCount = state.planItems.filter((i: { assignee_id: string; status: string }) => i.assignee_id === u.id && i.status !== 'published').length
-      const total = taskCount + itemCount
-      const pct = Math.round((total / 8) * 100)
-      return { ...u, taskCount, itemCount, total, pct }
-    })
-  }, [state.users, state.tasks, state.planItems])
+    const myRank = RANK[state.currentUser?.role || 'employee'] ?? 1
+    const meId = state.currentUser?.id
+    return state.users
+      .filter(u => u.id === meId || (RANK[u.role] ?? 1) < myRank)
+      .map(u => {
+        const taskCount = state.tasks.filter((t: { assignee_id: string; done: boolean }) => t.assignee_id === u.id && !t.done).length
+        const itemCount = state.planItems.filter((i: { assignee_id: string; status: string }) => i.assignee_id === u.id && i.status !== 'published').length
+        const total = taskCount + itemCount
+        const pct = Math.round((total / 8) * 100)
+        return { ...u, taskCount, itemCount, total, pct }
+      })
+  }, [state.users, state.tasks, state.planItems, state.currentUser])
 
   const [selectedMemberId, setSelectedMemberId] = useState<string>(() =>
     state.currentUser?.id || state.users[0]?.id || ''

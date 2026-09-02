@@ -95,7 +95,7 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
     owner:    ['myday','planner','calendar','contentplan','dmboard','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','permissions','connections','automations','knowledge','attendance'],
     manager:  ['myday','planner','calendar','contentplan','dmboard','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','knowledge','attendance'],
     sales:    ['myday','clients','client-detail','reports','pipeline','leads','attendance'],
-    employee: ['myday','planner','calendar','contentplan','knowledge','attendance'],
+    employee: ['myday','calendar','contentplan','knowledge','attendance'],
   }
   const dept = state.currentUser?.department
   const allowed = (id: string) => id === 'dmboard'
