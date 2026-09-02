@@ -2,7 +2,9 @@ import Groq from 'groq-sdk'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-export const MODEL = 'llama-3.3-70b-versatile'
+// Override via GROQ_MODEL env var. Default is a broadly-available Groq model;
+// bump to a larger one (e.g. openai/gpt-oss-120b) if your account has access.
+export const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
 
 export async function complete(prompt: string, system?: string): Promise<string> {
   const msgs: Groq.Chat.ChatCompletionMessageParam[] = []
