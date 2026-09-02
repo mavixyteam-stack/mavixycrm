@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { useApp, useToast } from '@/lib/store'
+import { useApp, useToast, useReloadWorkspace } from '@/lib/store'
 import { Plus, X, Check } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
@@ -25,6 +25,7 @@ const DEPARTMENTS = ['Operations', 'Management', 'Creative', 'Marketing', 'Sales
 export default function OnboardingScreen() {
   const { state } = useApp()
   const toast = useToast()
+  const reloadWorkspace = useReloadWorkspace()
   const isOwner = ['owner', 'manager'].includes(state.currentUser?.role || '')
 
   const [invites, setInvites] = useState<Invite[]>([])
@@ -187,7 +188,7 @@ export default function OnboardingScreen() {
         </div></ModalPortal>
       )}
 
-      {detail && <DetailModal invite={detail} onClose={() => setDetail(null)} onDone={() => { setDetail(null); load() }} toast={toast} />}
+      {detail && <DetailModal invite={detail} onClose={() => setDetail(null)} onDone={() => { setDetail(null); load(); reloadWorkspace() }} toast={toast} />}
     </div>
   )
 }
@@ -255,16 +256,18 @@ function DetailModal({ invite, onClose, onDone, toast }: { invite: Invite; onClo
             </div>
           )}
 
-          {done ? (
+          {done && (
             <div style={{ marginTop: 18, background: 'var(--c-green-bg)', border: '1px solid var(--c-green-border)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--c-green)', marginBottom: 3 }}>✓ Onboarded</div>
               <div style={{ fontSize: 12.5, color: 'var(--c-green)' }}>Account: {invite.m365_email} · welcome email sent to {invite.personal_email}{buddy ? ` · buddy: ${buddy.name}` : ''}</div>
             </div>
-          ) : (
-            <div style={{ marginTop: 18, background: 'var(--c-fill)', borderRadius: 12, padding: '16px' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Finish onboarding</div>
+          )}
+          <div style={{ marginTop: 18, background: 'var(--c-fill)', borderRadius: 12, padding: '16px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{done ? 'Repair / re-create account' : 'Finish onboarding'}</div>
               <div style={{ fontSize: 12.5, color: 'var(--c-subtle)', marginBottom: 14, lineHeight: 1.5 }}>
-                Create their M365 account externally first, then enter the login here. We'll create their Mavixy account and email the welcome pack to <strong>{invite.personal_email}</strong>.
+                {done
+                  ? 'Re-enter the login to re-create the Mavixy account and re-send the welcome email.'
+                  : <>Create their M365 account externally first, then enter the login here. We'll create their Mavixy account and email the welcome pack to <strong>{invite.personal_email}</strong>.</>}
               </div>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Work email (M365 ID)</label>
               <input value={m365Email} onChange={e => setM365Email(e.target.value)} style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }} />
@@ -278,10 +281,9 @@ function DetailModal({ invite, onClose, onDone, toast }: { invite: Invite; onClo
               </select>
               <button onClick={complete} disabled={saving}
                 style={{ width: '100%', marginTop: 14, padding: '12px', borderRadius: 11, background: 'var(--c-accent)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: saving ? .6 : 1 }}>
-                {saving ? 'Setting up…' : 'Create account & send welcome email'}
+                {saving ? 'Setting up…' : done ? 'Re-create account & re-send email' : 'Create account & send welcome email'}
               </button>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div></ModalPortal>

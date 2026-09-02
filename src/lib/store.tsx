@@ -313,6 +313,12 @@ export function useToast() {
   }, [dispatch])
 }
 
+/** Re-fetch clients, tasks, deals, users, etc. — e.g. after onboarding a hire. */
+export function useReloadWorkspace() {
+  const { dispatch } = useApp()
+  return useCallback(() => fetchWorkspace(dispatch), [dispatch])
+}
+
 // ── Supabase-synced mutation hooks ────────────────────────────────────────────
 
 function useDbErrorToast() {

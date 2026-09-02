@@ -33,36 +33,58 @@ export async function POST(req: NextRequest) {
 
   const { data: invite } = await admin.from('onboarding_invites').select('*').eq('token', token).maybeSingle()
   if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 })
-  if (invite.status !== 'submitted') {
+  // Allow re-running on a completed invite to repair a half-created account.
+  if (!['submitted', 'completed'].includes(invite.status)) {
     return NextResponse.json({ error: `Onboarding is '${invite.status}', expected 'submitted'` }, { status: 409 })
   }
 
   const name = invite.full_name || 'New teammate'
   const color = COLORS[Math.floor(Math.random() * COLORS.length)]
+  const meta = { name, role: invite.role, title: invite.title || '', color }
 
-  // 1. Create the auth user (login = work/M365 email, same password for both)
+  // 1. Create the auth user — or reuse+update it if the email already exists
+  //    (so a re-run repairs rather than errors).
+  let newUserId: string
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: m365_email,
     password: m365_password,
     email_confirm: true,
-    user_metadata: { name, role: invite.role, title: invite.title || '', color },
+    user_metadata: meta,
   })
-  if (createErr || !created?.user) {
+  if (created?.user) {
+    newUserId = created.user.id
+  } else if (createErr && /registered|already|exists|duplicate/i.test(createErr.message)) {
+    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    const existing = list?.users?.find(u => (u.email || '').toLowerCase() === m365_email.toLowerCase())
+    if (!existing) return NextResponse.json({ error: createErr.message }, { status: 400 })
+    newUserId = existing.id
+    await admin.auth.admin.updateUserById(newUserId, { password: m365_password, email_confirm: true, user_metadata: meta })
+  } else {
     return NextResponse.json({ error: createErr?.message || 'Could not create the account' }, { status: 400 })
   }
-  const newUserId = created.user.id
 
-  // 2. Ensure the profile row reflects the right details (idempotent)
-  await admin.from('profiles').upsert({
-    id: newUserId,
-    email: m365_email,
-    name,
-    role: invite.role,
-    title: invite.title || '',
-    color,
-    initials: initials(name),
-    permissions: [],
-  })
+  // 2. Ensure the profile row exists with the right details, surfacing errors.
+  const profileRow: Record<string, unknown> = {
+    id: newUserId, email: m365_email, name, role: invite.role,
+    title: invite.title || '', color, initials: initials(name), permissions: [],
+  }
+  let row = { ...profileRow }
+  let profileErr: string | null = null
+  for (let i = 0; i < 4; i++) {
+    const { error } = await admin.from('profiles').upsert(row)
+    if (!error) { profileErr = null; break }
+    const missing = error.message?.match(/Could not find the '(.+?)' column/)?.[1]
+    if (missing && !['id', 'email', 'name', 'role'].includes(missing)) { delete row[missing]; continue }
+    profileErr = error.message
+    break
+  }
+  // Verify the profile is actually readable now
+  const { data: check } = await admin.from('profiles').select('id').eq('id', newUserId).maybeSingle()
+  if (!check) {
+    return NextResponse.json({
+      error: `Account auth was created but the profile was not: ${profileErr || 'unknown error'}. The user id is ${newUserId}.`,
+    }, { status: 500 })
+  }
 
   // 3. Mark the invite complete
   await admin.from('onboarding_invites').update({
