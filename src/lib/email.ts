@@ -346,6 +346,30 @@ export function buildOnboardingInviteEmail(opts: {
   return layout(content, 'You\'re invited to join Mavixy — fill in your onboarding details')
 }
 
+// ─── AI daily report (to owners) ──────────────────────────────────────────────
+
+export function buildDailyReportEmail(opts: {
+  recipientName: string
+  date: string
+  bodyHtml: string
+  stats: { label: string; value: string }[]
+}) {
+  const { recipientName, date, bodyHtml, stats } = opts
+  const statCells = stats.map(s => `
+    <td style="text-align:center;padding:14px 10px;">
+      <div style="font-size:22px;font-weight:700;color:#0E0F0C;">${s.value}</div>
+      <div style="font-size:11px;color:#9A9E94;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">${s.label}</div>
+    </td>`).join('<td style="width:1px;background:#EEF0EA;"></td>')
+
+  const content = `
+    ${header('DAILY REPORT', `Today at the agency · ${date}`, '#7C3AED')}
+    <div style="padding:20px 28px 4px;font-size:14px;color:#5A5E54;">Hi ${recipientName}, here's your AI-generated wrap-up of the day.</div>
+    ${stats.length ? `<table style="width:100%;border-collapse:collapse;border-top:1px solid #EEF0EA;border-bottom:1px solid #EEF0EA;margin:12px 0;"><tr>${statCells}</tr></table>` : ''}
+    <div style="padding:8px 28px 24px;font-size:14.5px;line-height:1.7;color:#1F2219;">${bodyHtml}</div>
+  `
+  return layout(content, `Daily report · ${date}`)
+}
+
 // ─── Onboarding welcome ───────────────────────────────────────────────────────
 
 const M365_LOGIN_URL = 'https://www.office.com/login'

@@ -161,6 +161,19 @@ export async function dbUpsertDeal(deal: Deal) {
   })
 }
 
+// ─── Work logs (end-of-day updates) ──────────────────────────────────────────
+
+export async function dbUpsertWorkLog(userId: string, note: string) {
+  const d = new Date()
+  const date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  await apiUpsert('work_logs', {
+    id: crypto.randomUUID(),
+    user_id: userId,
+    date,
+    note,
+  })
+}
+
 // ─── Attendance check-in / check-out ─────────────────────────────────────────
 
 function localDateStr(): string {

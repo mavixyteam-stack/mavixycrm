@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useApp, useToast, useMarkNotifRead, useMarkAllNotifRead } from '@/lib/store'
-import { dbCheckIn, dbCheckOut } from '@/lib/db'
+import { dbCheckIn, dbCheckOut, dbUpsertWorkLog } from '@/lib/db'
 import { Bell, Search, Check, X } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import type { Screen, NotificationType } from '@/types'
@@ -30,6 +30,9 @@ export default function TopBar() {
   const toast = useToast()
   const [tick, setTick] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [logNote, setLogNote] = useState('')
+  const [submittingLog, setSubmittingLog] = useState(false)
 
   useEffect(() => {
     if (state.checkedIn) {
@@ -63,16 +66,32 @@ export default function TopBar() {
     dispatch({ type:'END_BREAK', ms })
     toast('Break ended — timer resumed')
   }
-  async function checkOut() {
+  // Checkout now requires an end-of-day work log.
+  async function submitCheckout() {
+    if (!logNote.trim()) { toast('Add a quick note on what you got done today'); return }
+    setSubmittingLog(true)
     const breakMs = state.totalBreakMs + (state.onBreak && state.breakStart ? Date.now() - state.breakStart.getTime() : 0)
     const breakMinutes = Math.round(breakMs / 60000)
-    dispatch({ type:'CHECK_OUT' })
-    toast(`Checked out — ${workingTime} logged`)
-    if (state.currentUser?.id) {
-      try { await dbCheckOut(state.currentUser.id, breakMinutes) }
-      catch { toast('Check-out saved locally — DB sync failed, check console') }
+    const logged = workingTime
+    try {
+      if (state.currentUser?.id) {
+        await dbUpsertWorkLog(state.currentUser.id, logNote.trim())
+        await dbCheckOut(state.currentUser.id, breakMinutes)
+      }
+      dispatch({ type:'CHECK_OUT' })
+      toast(`Checked out — ${logged} logged. Nice work today!`)
+      setCheckoutOpen(false); setLogNote('')
+    } catch {
+      toast('Check-out failed — please try again')
+    } finally {
+      setSubmittingLog(false)
     }
   }
+
+  const myOpenWork = [
+    ...state.tasks.filter(t => t.assignee_id === state.currentUser?.id && !t.done).map(t => t.title),
+    ...state.planItems.filter(p => p.assignee_id === state.currentUser?.id && p.status !== 'published').map(p => p.title),
+  ].slice(0, 6)
 
   const markRead = useMarkNotifRead()
   const markAllRead = useMarkAllNotifRead()
@@ -132,7 +151,7 @@ export default function TopBar() {
               ) : (
                 <button onClick={startBreak} style={{ fontSize:12, fontWeight:600, color:'var(--c-subtle)', padding:'4px 9px', borderRadius:7, background:'var(--c-fill)', transition:'background .15s' }}>Break</button>
               )}
-              <button onClick={checkOut} style={{ fontSize:12, fontWeight:600, color:'var(--c-red)', padding:'4px 9px', borderRadius:7, background:'var(--c-red-bg)' }}>Out</button>
+              <button onClick={() => { setLogNote(''); setCheckoutOpen(true) }} style={{ fontSize:12, fontWeight:600, color:'var(--c-red)', padding:'4px 9px', borderRadius:7, background:'var(--c-red-bg)' }}>Out</button>
             </>
           )}
         </div>
@@ -201,6 +220,44 @@ export default function TopBar() {
                 )}
               </div>
             )}
+          </div>
+        </div></ModalPortal>
+      )}
+
+      {/* Checkout — end-of-day work log */}
+      {checkoutOpen && (
+        <ModalPortal><div onClick={() => !submittingLog && setCheckoutOpen(false)} className="modal-overlay">
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:460, background:'#fff', borderRadius:20, overflow:'hidden', boxShadow:'var(--shadow-modal)', animation:'popIn .22s cubic-bezier(.2,.9,.3,1) both' }}>
+            <div style={{ padding:'20px 22px 14px', borderBottom:'1px solid var(--c-border-soft)' }}>
+              <div style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:17 }}>Wrap up your day</div>
+              <div style={{ fontSize:12.5, color:'var(--c-faint)', marginTop:2 }}>{workingTime} worked · a quick note before you check out</div>
+            </div>
+            <div style={{ padding:'18px 22px' }}>
+              <label style={{ fontSize:12.5, fontWeight:600, color:'var(--c-muted)', display:'block', marginBottom:6 }}>What did you get done today?</label>
+              <textarea autoFocus value={logNote} onChange={e => setLogNote(e.target.value)} rows={5}
+                placeholder={"• Finished the Weekend Doors reel edit\n• Drafted 3 SEO meta descriptions for Lumio\n• Reviewed SUNSO carousel with the team"}
+                style={{ width:'100%', border:'1.5px solid var(--c-border)', borderRadius:12, padding:'11px 13px', fontSize:14, lineHeight:1.6, resize:'vertical', boxSizing:'border-box', outline:'none' }}
+                onFocus={e => e.target.style.borderColor='var(--c-ink)'} onBlur={e => e.target.style.borderColor='var(--c-border)'} />
+              {myOpenWork.length > 0 && (
+                <div style={{ marginTop:12 }}>
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.05em', color:'var(--c-faint)', textTransform:'uppercase', marginBottom:6 }}>Your open work — tap to add</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                    {myOpenWork.map((title, i) => (
+                      <button key={i} onClick={() => setLogNote(n => (n ? n.replace(/\n?$/, '\n') : '') + `• ${title}`)}
+                        style={{ fontSize:12, color:'var(--c-ink-2)', background:'var(--c-fill)', border:'1px solid var(--c-border)', borderRadius:8, padding:'5px 10px', cursor:'pointer', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        + {title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ padding:'14px 22px', borderTop:'1px solid var(--c-border-soft)', display:'flex', gap:10 }}>
+              <button onClick={() => setCheckoutOpen(false)} disabled={submittingLog} style={{ flex:1, padding:'11px', borderRadius:11, border:'1.5px solid var(--c-border)', fontSize:14, fontWeight:600, color:'var(--c-subtle)', background:'#fff' }}>Cancel</button>
+              <button onClick={submitCheckout} disabled={submittingLog} style={{ flex:2, padding:'11px', borderRadius:11, background:'var(--c-red)', color:'#fff', fontSize:14, fontWeight:700, border:'none', display:'flex', alignItems:'center', justifyContent:'center', gap:7, opacity:submittingLog?.6:1 }}>
+                {submittingLog ? 'Checking out…' : 'Submit & check out'}
+              </button>
+            </div>
           </div>
         </div></ModalPortal>
       )}

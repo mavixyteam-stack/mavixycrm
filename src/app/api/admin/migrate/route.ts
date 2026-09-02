@@ -122,7 +122,23 @@ DROP POLICY IF EXISTS "mavixy_onboarding" ON onboarding_invites;
 -- Private storage bucket for onboarding documents (Aadhaar/PAN)
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('onboarding-docs', 'onboarding-docs', false)
-ON CONFLICT (id) DO NOTHING;`
+ON CONFLICT (id) DO NOTHING;
+
+-- Department on profiles (discipline: Creative / Digital Marketing / Sales …)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS department TEXT;
+
+-- End-of-day work logs (what each person got done, captured at checkout)
+CREATE TABLE IF NOT EXISTS work_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  date DATE NOT NULL,
+  note TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS work_logs_user_date_idx ON work_logs (user_id, date);
+ALTER TABLE work_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mavixy_work_logs" ON work_logs;
+CREATE POLICY "mavixy_work_logs" ON work_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
