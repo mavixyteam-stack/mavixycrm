@@ -395,12 +395,25 @@ export function useUpsertTask() {
 }
 
 export function useUpsertDeal() {
-  const { dispatch } = useApp()
+  const { state, dispatch } = useApp()
   const errToast = useDbErrorToast()
   return useCallback(async (deal: Deal) => {
+    const prev = state.deals.find(d => d.id === deal.id)
+    const me = state.currentUser?.id
+    const newlyAssigned = !!deal.owner_id && deal.owner_id !== me && (!prev || prev.owner_id !== deal.owner_id)
     dispatch({ type: 'UPSERT_DEAL', deal })
     try { await dbUpsertDeal(deal) } catch (e) { errToast('upsertDeal', e) }
-  }, [dispatch, errToast])
+    if (newlyAssigned) {
+      const assigner = state.currentUser?.name?.split(' ')[0] || 'Someone'
+      const isLead = deal.stage === 'lead'
+      notifyUsers([deal.owner_id], {
+        title: isLead ? 'New lead assigned' : 'New deal assigned',
+        text: `${assigner} assigned you ${isLead ? 'a lead' : 'a deal'}: ${deal.name}${deal.company ? ` · ${deal.company}` : ''}`,
+        type: 'info',
+        link: isLead ? 'leads' : 'pipeline',
+      })
+    }
+  }, [state, dispatch, errToast])
 }
 
 export function useDeleteDeal() {
