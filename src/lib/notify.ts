@@ -23,6 +23,35 @@ export interface NotifyChannels {
   telegram?: boolean  // also Telegram the recipient if linked (default true)
 }
 
+// Pick a distinct leading emoji per notification kind (used in Telegram).
+function notifEmoji(n: NotifyInput): string {
+  const s = `${n.title || ''} ${n.text || ''}`.toLowerCase()
+  if (/onboard/.test(s)) return /complete|live|welcome/.test(s) ? '🎉' : '🚀'
+  if (/daily report/.test(s)) return '📊'
+  if (/leave/.test(s)) return '🌴'
+  if (/correction/.test(s)) return '🕐'
+  if (/approved/.test(s)) return '✅'
+  if (/declined|rejected/.test(s)) return '⛔'
+  if (/log your day|end-of-day|end of day|sign off|check ?out/.test(s)) return '📝'
+  if (/overdue|past due|deadline|needs attention|due (today|tomorrow)|for today/.test(s)) return '⏳'
+  if (/follow[- ]?up/.test(s)) return '📞'
+  if (/content assigned|reel|carousel|video|creative/.test(s)) return '🎬'
+  if (/lead|deal/.test(s)) return '💼'
+  if (/task/.test(s)) return '📋'
+  if (n.type === 'reminder') return '⏰'
+  if (n.type === 'request') return '📥'
+  if (n.type === 'warning') return '⚠️'
+  if (n.type === 'success') return '✅'
+  return '🔔'
+}
+
+function telegramLine(n: NotifyInput): string {
+  const emoji = notifEmoji(n)
+  // Strip any leading emoji already baked into the title so we don't double up.
+  const title = (n.title || '').replace(/^\s*[\p{Extended_Pictographic}☀-➿]+\s*/u, '').trim()
+  return title ? `${emoji} ${title}\n${n.text}` : `${emoji} ${n.text}`
+}
+
 async function insertRows(admin: SupabaseClient, ids: string[], n: NotifyInput): Promise<boolean> {
   let rows: Record<string, unknown>[] = ids.map(user_id => ({
     user_id,
@@ -80,10 +109,10 @@ export async function createNotifications(
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     const sends: Promise<unknown>[] = []
+    const line = telegramLine(n)
 
     for (const p of profiles || []) {
       const firstName = (p.name?.split(' ')[0]) || 'there'
-      const line = n.title ? `🔔 ${n.title}\n${n.text}` : `🔔 ${n.text}`
 
       if (wantTelegram && p.telegram_chat_id) {
         sends.push(sendTelegram(p.telegram_chat_id, line))
