@@ -6,7 +6,7 @@ export type Screen =
   | 'myday' | 'planner' | 'calendar' | 'contentplan'
   | 'clients' | 'client-detail' | 'reports' | 'onboarding'
   | 'pipeline' | 'leads'
-  | 'team' | 'permissions' | 'performance' | 'connections' | 'automations' | 'knowledge'
+  | 'team' | 'permissions' | 'performance' | 'connections' | 'automations' | 'knowledge' | 'assistant'
   | 'attendance'
 
 export interface Profile {

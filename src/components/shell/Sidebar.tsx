@@ -35,6 +35,7 @@ const NAV = [
   {
     group: 'Org',
     items: [
+      { id:'assistant', label:'Ask Mavixy', Icon: () => <Sparkle size={15} color="currentColor" /> },
       { id:'team', label:'Team', Icon: Users },
       { id:'onboarding', label:'Onboarding', Icon: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg> },
       { id:'performance', label:'Performance', Icon: BarChart },
@@ -90,8 +91,8 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
   }
 
   const ROLE_SCREENS: Record<string, string[]> = {
-    owner:    ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','performance','permissions','connections','automations','knowledge','attendance'],
-    manager:  ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','performance','knowledge','attendance'],
+    owner:    ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','permissions','connections','automations','knowledge','attendance'],
+    manager:  ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','knowledge','attendance'],
     sales:    ['myday','clients','client-detail','reports','pipeline','leads','attendance'],
     employee: ['myday','planner','calendar','contentplan','knowledge','attendance'],
   }

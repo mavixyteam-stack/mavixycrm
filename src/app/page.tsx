@@ -23,6 +23,7 @@ import AutomationsScreen from '@/components/org/AutomationsScreen'
 import KnowledgeScreen from '@/components/org/KnowledgeScreen'
 import AttendanceScreen from '@/components/org/AttendanceScreen'
 import OnboardingScreen from '@/components/org/OnboardingScreen'
+import AssistantScreen from '@/components/org/AssistantScreen'
 import { Sparkle } from '@/components/ui/Icon'
 import type { Screen, Role } from '@/types'
 
@@ -70,6 +71,7 @@ const SCREEN_PATHS: Record<string, Screen> = {
   '/knowledge': 'knowledge',
   '/attendance': 'attendance',
   '/onboarding': 'onboarding',
+  '/ask': 'assistant',
 }
 
 const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
@@ -89,6 +91,7 @@ const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
   knowledge: '/knowledge',
   attendance: '/attendance',
   onboarding: '/onboarding',
+  assistant: '/ask',
 }
 
 // ─── RBAC matrix ─────────────────────────────────────────────────────────────
@@ -97,13 +100,13 @@ const ROLE_SCREENS: Record<Role, Screen[]> = {
     'myday','planner','calendar','contentplan',
     'clients','client-detail','reports',
     'pipeline','leads',
-    'team','performance','permissions','connections','automations','knowledge','attendance','onboarding',
+    'team','performance','permissions','connections','automations','knowledge','attendance','onboarding','assistant',
   ],
   manager: [
     'myday','planner','calendar','contentplan',
     'clients','client-detail','reports',
     'pipeline','leads',
-    'team','performance','knowledge','attendance','onboarding',
+    'team','performance','knowledge','attendance','onboarding','assistant',
   ],
   sales: [
     'myday','clients','client-detail','reports','pipeline','leads','attendance',
@@ -235,6 +238,7 @@ function AppShell() {
       case 'knowledge':   return <KnowledgeScreen />
       case 'attendance':  return <AttendanceScreen />
       case 'onboarding':  return <OnboardingScreen />
+      case 'assistant':   return <AssistantScreen />
       default:            return <MyDay />
     }
   }
