@@ -151,6 +151,7 @@ ${snapshot}
         due,
         done: false,
         status: 'todo',
+        refs: [],   // refs is NOT NULL in the tasks table
       })
 
       if (error) {

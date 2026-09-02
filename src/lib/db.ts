@@ -128,7 +128,7 @@ export async function dbUpsertTask(task: Task) {
     idea: task.idea || null,
     hook: task.hook || null,
     format: task.format || null,
-    refs: task.refs || null,
+    refs: task.refs || [],   // refs is NOT NULL in the tasks table; send [] not null
     department: task.department || null,
     channel: task.channel || null,
     goal: task.goal || null,
