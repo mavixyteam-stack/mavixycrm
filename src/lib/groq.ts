@@ -20,6 +20,21 @@ export async function complete(prompt: string, system?: string): Promise<string>
   return res.choices[0]?.message?.content ?? ''
 }
 
+// Forces valid JSON output (Groq JSON mode). The prompt/system must mention JSON.
+export async function completeJSON(prompt: string, system: string): Promise<string> {
+  const res = await groq.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt },
+    ],
+    max_tokens: 1024,
+    temperature: 0.3,
+    response_format: { type: 'json_object' },
+  })
+  return res.choices[0]?.message?.content ?? '{}'
+}
+
 export async function streamComplete(
   prompt: string,
   system: string,

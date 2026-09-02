@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { adminClient } from '@/lib/notify'
-import { complete } from '@/lib/groq'
+import { adminClient, createNotifications } from '@/lib/notify'
+import { completeJSON } from '@/lib/groq'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 function ymd(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
@@ -84,19 +84,90 @@ export async function POST(req: NextRequest) {
     ? history.slice(-6).map((h: { role: string; text: string }) => `${h.role === 'user' ? 'Owner' : 'You'}: ${h.text}`).join('\n')
     : ''
 
-  const system = `You are Mavixy — the AI chief of staff for a creative marketing agency, speaking to ${caller.name?.split(' ')[0] || 'the founder'} (the ${caller.role}).
-You have a live snapshot of the whole company below. Answer the owner's question using ONLY this data — be specific, name people, clients and numbers. If the data doesn't cover something, say so briefly. Be sharp and concise (a few sentences or a short bulleted list), like a trusted operator giving a straight answer. Use ₹ for money. Today is ${now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.
+  const todayLabel = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const teamNames = (profiles || []).map(p => p.name).join(', ')
+  const clientList = (clients || []).map(c => c.name).join(', ')
+
+  const system = `You are Mavixy — the AI chief of staff for a creative marketing agency, speaking to ${caller.name?.split(' ')[0] || 'the founder'} (the ${caller.role}). Today is ${todayLabel} (${today}).
+
+You do two things:
+1) ANSWER questions about the company using ONLY the live snapshot below — specific, names people/clients/numbers, sharp and concise, ₹ for money.
+2) CREATE A TASK when the owner tells you to assign work (e.g. "let Jigar make a video for Lumio by tomorrow", "assign an SEO audit to Rahul").
+
+You MUST reply as a single JSON object with this exact shape:
+{
+  "reply": "<your short message to the owner>",
+  "action": null OR {
+    "type": "create_task",
+    "assignee": "<exact full name from the TEAM list>",
+    "title": "<clear task title>",
+    "client": "<exact client name from CLIENTS, or null>",
+    "due": "<YYYY-MM-DD, or null>",
+    "priority": "Low" | "Medium" | "High",
+    "department": "Creative" | "Digital Marketing" | "Sales" | "General"
+  }
+}
+Rules for actions: use an EXACT name from TEAM for "assignee" (team: ${teamNames}); use an EXACT name from CLIENTS for "client" or null (clients: ${clientList}); resolve relative dates yourself (tomorrow = the day after ${today}); pick department from the work (a video/reel/post = Creative; SEO/ads/analytics = Digital Marketing). If you can't tell who to assign, set "action" to null and ask who in "reply". For pure questions, set "action" to null and put the answer in "reply".
 
 === LIVE COMPANY SNAPSHOT ===
 ${snapshot}
 === END SNAPSHOT ===`
 
-  const prompt = `${historyText ? `Recent conversation:\n${historyText}\n\n` : ''}Owner's question: ${question.trim()}`
+  const prompt = `${historyText ? `Recent conversation:\n${historyText}\n\n` : ''}Owner: ${question.trim()}\n\nRespond with the JSON object.`
 
+  let parsed: { reply?: string; action?: { type?: string; assignee?: string; title?: string; client?: string | null; due?: string | null; priority?: string; department?: string } | null }
   try {
-    const answer = await complete(prompt, system)
-    return NextResponse.json({ ok: true, answer })
+    const raw = await completeJSON(prompt, system)
+    parsed = JSON.parse(raw)
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'AI unavailable' }, { status: 500 })
   }
+
+  let reply = parsed.reply || ''
+  let created = false
+
+  const a = parsed.action
+  if (a && a.type === 'create_task' && a.title) {
+    // Resolve the assignee by name (exact, then first-name, then contains)
+    const want = (a.assignee || '').trim().toLowerCase()
+    const assignee = (profiles || []).find(p => p.name?.toLowerCase() === want)
+      || (profiles || []).find(p => p.name?.toLowerCase().split(' ')[0] === want.split(' ')[0] && want)
+      || (profiles || []).find(p => want && p.name?.toLowerCase().includes(want))
+
+    if (!assignee) {
+      reply = reply || `I couldn't tell who "${a.assignee || 'that'}" is on the team. Who should I assign it to?`
+    } else {
+      const client = a.client ? (clients || []).find(c => c.name?.toLowerCase() === a.client!.toLowerCase()) : null
+      const dept = a.department && ['Creative', 'Digital Marketing', 'Sales', 'General'].includes(a.department) ? a.department : (assignee.department || 'Creative')
+      const due = a.due && /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : null
+
+      const { error } = await db.from('tasks').insert({
+        title: a.title,
+        client_id: client?.id || null,
+        assignee_id: assignee.id,
+        type: dept,
+        department: dept,
+        priority: ['Low', 'Medium', 'High'].includes(a.priority || '') ? a.priority : 'Medium',
+        due,
+        done: false,
+        status: 'todo',
+      })
+
+      if (error) {
+        reply = `I hit a snag creating that task: ${error.message}`
+      } else {
+        created = true
+        await createNotifications(db, [assignee.id], {
+          title: 'New task assigned',
+          text: `${caller.name?.split(' ')[0] || 'The owner'} assigned you a task${client ? ` for ${client.name}` : ''}: ${a.title}${due ? ` (due ${due})` : ''}`,
+          type: 'info',
+          link: dept === 'Digital Marketing' ? 'dmboard' : 'myday',
+        })
+        const first = assignee.name.split(' ')[0]
+        reply = `✅ Done — created "${a.title}"${client ? ` for ${client.name}` : ''} for ${first}${due ? `, due ${due}` : ''}. ${first} has been notified.`
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, answer: reply || 'Done.', created })
 }
