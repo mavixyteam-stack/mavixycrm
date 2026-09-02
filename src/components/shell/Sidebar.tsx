@@ -15,6 +15,7 @@ const NAV = [
       { id:'planner', label:'Day Planner', Icon: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"/></svg> },
       { id:'calendar', label:'Content Calendar', Icon: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> },
       { id:'contentplan', label:'Content Planner', Icon: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 4h8v3H8zM5 7h14v14H5zM9 12h6M9 16h4"/></svg> },
+      { id:'dmboard', label:'Digital Marketing', Icon: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18M18 9l-5 5-3-3-4 4"/></svg> },
       { id:'attendance', label:'Attendance', Icon: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg> },
     ]
   },
@@ -91,12 +92,15 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
   }
 
   const ROLE_SCREENS: Record<string, string[]> = {
-    owner:    ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','permissions','connections','automations','knowledge','attendance'],
-    manager:  ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','knowledge','attendance'],
+    owner:    ['myday','planner','calendar','contentplan','dmboard','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','permissions','connections','automations','knowledge','attendance'],
+    manager:  ['myday','planner','calendar','contentplan','dmboard','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','knowledge','attendance'],
     sales:    ['myday','clients','client-detail','reports','pipeline','leads','attendance'],
     employee: ['myday','planner','calendar','contentplan','knowledge','attendance'],
   }
-  const allowed = (id: string) => (ROLE_SCREENS[role] || ROLE_SCREENS.employee).includes(id)
+  const dept = state.currentUser?.department
+  const allowed = (id: string) => id === 'dmboard'
+    ? (['owner', 'manager'].includes(role) || dept === 'Digital Marketing')
+    : (ROLE_SCREENS[role] || ROLE_SCREENS.employee).includes(id)
   const nav = (screen: Screen) => dispatch({ type:'SET_SCREEN', screen })
 
   return (

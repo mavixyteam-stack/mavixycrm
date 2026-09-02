@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Only owners can update accounts' }, { status: 403 })
   }
 
-  const { user_id, name, title, role, color, new_password } = await req.json()
+  const { user_id, name, title, role, color, department, new_password } = await req.json()
   if (!user_id) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
 
   const admin = createServiceClient(
@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
   if (title !== undefined) profileUpdate.title = title
   if (role !== undefined) profileUpdate.role = role
   if (color !== undefined) profileUpdate.color = color
+  if (department !== undefined) profileUpdate.department = department
 
   if (Object.keys(profileUpdate).length > 0) {
     const { error } = await admin.from('profiles').update(profileUpdate).eq('id', user_id)

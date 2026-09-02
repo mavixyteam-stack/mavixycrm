@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { Plus, X } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
+import { DEPARTMENTS } from '@/lib/onboarding'
 import type { Profile } from '@/types'
 
 const CAPACITY_MAX = 8
@@ -66,7 +67,7 @@ export default function TeamScreen() {
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
 
   const [form, setForm] = useState({ name:'', email:'', title:'', role:'employee' as 'owner'|'manager'|'sales'|'employee', color:'#0EA5A4', password:'' })
-  const [editForm, setEditForm] = useState({ name:'', title:'', role:'employee', color:'', new_password:'', showPass: false })
+  const [editForm, setEditForm] = useState({ name:'', title:'', role:'employee', department:'', color:'', new_password:'', showPass: false })
   const [saving, setSaving] = useState(false)
   const [showAddPass, setShowAddPass] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -135,7 +136,7 @@ export default function TeamScreen() {
 
   function openEdit(u: Profile) {
     setEditUser(u)
-    setEditForm({ name: u.name, title: u.title || '', role: u.role, color: u.color, new_password: '', showPass: false })
+    setEditForm({ name: u.name, title: u.title || '', role: u.role, department: u.department || '', color: u.color, new_password: '', showPass: false })
   }
 
   async function saveEdit() {
@@ -149,6 +150,7 @@ export default function TeamScreen() {
         name: editForm.name.trim(),
         title: editForm.title,
         role: editForm.role,
+        department: editForm.department,
         color: editForm.color,
       }
       if (editForm.new_password) body.new_password = editForm.new_password
@@ -159,7 +161,7 @@ export default function TeamScreen() {
       const data = await res.json()
       if (!res.ok) { toast(`Error: ${data.error}`); setSaving(false); return }
       const initials = editForm.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-      dispatch({ type: 'UPSERT_USER', user: { ...editUser, name: editForm.name.trim(), initials, title: editForm.title, role: editForm.role as any, color: editForm.color } })
+      dispatch({ type: 'UPSERT_USER', user: { ...editUser, name: editForm.name.trim(), initials, title: editForm.title, role: editForm.role as any, department: editForm.department, color: editForm.color } })
       toast(editForm.new_password ? 'Profile updated & password reset' : 'Profile updated')
       setEditUser(null)
     } catch { toast('Failed to save changes') }
@@ -446,6 +448,17 @@ export default function TeamScreen() {
                   </div>
                 </div>
               )}
+
+              {/* Department */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', display: 'block', marginBottom: 5 }}>Department</label>
+                <select value={editForm.department} onChange={e => setEditForm(f => ({ ...f, department: e.target.value }))}
+                  style={{ width: '100%', border: '1.5px solid var(--c-border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#fff', cursor: 'pointer', boxSizing: 'border-box' }}>
+                  <option value="">No department</option>
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginTop: 5 }}>Digital Marketing unlocks the performance board for this person.</div>
+              </div>
 
               {/* Avatar color */}
               <div>

@@ -9,6 +9,7 @@ import TopBar from '@/components/shell/TopBar'
 import MyDay from '@/components/work/MyDay'
 import ContentCalendar from '@/components/work/ContentCalendar'
 import ContentPlanner from '@/components/work/ContentPlanner'
+import DigitalMarketingScreen from '@/components/work/DigitalMarketingScreen'
 import DayPlanner from '@/components/work/DayPlanner'
 import ClientsScreen from '@/components/accounts/ClientsScreen'
 import ClientDetail from '@/components/accounts/ClientDetail'
@@ -59,6 +60,7 @@ const SCREEN_PATHS: Record<string, Screen> = {
   '/planner': 'planner',
   '/calendar': 'calendar',
   '/content': 'contentplan',
+  '/marketing': 'dmboard',
   '/clients': 'clients',
   '/reports': 'reports',
   '/pipeline': 'pipeline',
@@ -79,6 +81,7 @@ const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
   planner: '/planner',
   calendar: '/calendar',
   contentplan: '/content',
+  dmboard: '/marketing',
   clients: '/clients',
   reports: '/reports',
   pipeline: '/pipeline',
@@ -116,7 +119,9 @@ const ROLE_SCREENS: Record<Role, Screen[]> = {
   ],
 }
 
-function canAccess(role: Role, screen: Screen): boolean {
+function canAccess(role: Role, screen: Screen, department?: string | null): boolean {
+  // The Digital Marketing board is for leadership + the Digital Marketing team.
+  if (screen === 'dmboard') return ['owner', 'manager'].includes(role) || department === 'Digital Marketing'
   return ROLE_SCREENS[role]?.includes(screen) ?? false
 }
 
@@ -147,14 +152,15 @@ function AppShell() {
   const { state, dispatch } = useApp()
   const sb = createClient()
   const role = (state.currentUser?.role || 'employee') as Role
+  const department = state.currentUser?.department
   const isPopState = useRef(false)
 
   // Redirect to allowed screen if current screen is blocked
   useEffect(() => {
-    if (state.isLoggedIn && !canAccess(role, state.screen)) {
+    if (state.isLoggedIn && !canAccess(role, state.screen, department)) {
       dispatch({ type: 'SET_SCREEN', screen: defaultScreen(role) })
     }
-  }, [role, state.screen, state.isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [role, department, state.screen, state.isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync screen → URL
   useEffect(() => {
@@ -217,7 +223,7 @@ function AppShell() {
   }
 
   function renderScreen() {
-    if (!canAccess(role, state.screen)) {
+    if (!canAccess(role, state.screen, department)) {
       return <AccessDenied screen={state.screen} role={role} />
     }
     switch (state.screen) {
@@ -225,6 +231,7 @@ function AppShell() {
       case 'planner':     return <DayPlanner />
       case 'calendar':    return <ContentCalendar />
       case 'contentplan': return <ContentPlanner />
+      case 'dmboard':     return <DigitalMarketingScreen />
       case 'clients':     return <ClientsScreen />
       case 'client-detail': return <ClientDetail />
       case 'reports':     return <ReportsScreen />

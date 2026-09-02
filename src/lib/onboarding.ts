@@ -2,6 +2,9 @@
 
 const WORK_DOMAIN = process.env.NEXT_PUBLIC_WORK_EMAIL_DOMAIN || 'mavixy.com'
 
+// Canonical departments. 'Digital Marketing' unlocks the DM/performance board.
+export const DEPARTMENTS = ['Creative', 'Digital Marketing', 'Sales', 'Operations', 'Management', 'Finance']
+
 /** Short, URL-safe, unguessable invite token. */
 export function makeInviteToken(): string {
   const bytes = new Uint8Array(18)

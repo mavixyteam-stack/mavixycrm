@@ -129,6 +129,10 @@ export async function dbUpsertTask(task: Task) {
     hook: task.hook || null,
     format: task.format || null,
     refs: task.refs || null,
+    department: task.department || null,
+    channel: task.channel || null,
+    goal: task.goal || null,
+    status: task.status || null,
   })
 }
 

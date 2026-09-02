@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useApp, useToast, useReloadWorkspace } from '@/lib/store'
 import { Plus, X, Check } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
+import { DEPARTMENTS } from '@/lib/onboarding'
 
 interface Invite {
   id: string; token: string; role: string; title: string | null; department: string | null; status: string
@@ -20,7 +21,6 @@ const STATUS_STYLE: Record<string, { label: string; c: string; bg: string }> = {
   completed: { label: 'Onboarded', c: '#0E8C63', bg: '#E7FAF3' },
 }
 
-const DEPARTMENTS = ['Operations', 'Management', 'Creative', 'Marketing', 'Sales', 'Design', 'Content', 'Finance']
 
 export default function OnboardingScreen() {
   const { state } = useApp()

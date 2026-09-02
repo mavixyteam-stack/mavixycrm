@@ -3,7 +3,7 @@ export type Role = 'owner' | 'manager' | 'sales' | 'employee'
 export type NavGroup = 'work' | 'accounts' | 'sales' | 'org'
 
 export type Screen =
-  | 'myday' | 'planner' | 'calendar' | 'contentplan'
+  | 'myday' | 'planner' | 'calendar' | 'contentplan' | 'dmboard'
   | 'clients' | 'client-detail' | 'reports' | 'onboarding'
   | 'pipeline' | 'leads'
   | 'team' | 'permissions' | 'performance' | 'connections' | 'automations' | 'knowledge' | 'assistant'
@@ -17,6 +17,7 @@ export interface Profile {
   color: string
   initials: string
   title: string
+  department?: string | null
   permissions: string[]
   telegram_chat_id?: string | null
   created_at: string
@@ -78,6 +79,10 @@ export interface Task {
   hook?: string
   format?: string
   refs?: { label: string }[]
+  department?: string | null   // Creative | Digital Marketing | Sales | General
+  channel?: string | null      // for Digital Marketing: SEO | Google Ads | Meta Ads | …
+  goal?: string | null         // the objective / target metric
+  status?: string | null       // todo | in_progress | done
   created_at: string
 }
 
