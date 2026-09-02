@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
-import { Sparkle, Calendar, BarChart, Building, Users, TrendUp, Book, Settings, Zap, Inbox, FileText, Globe, LogOut, X } from '@/components/ui/Icon'
+import { Sparkle, Calendar, BarChart, Building, Users, TrendUp, Book, Settings, Zap, FileText, Globe, LogOut, X } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import type { Screen } from '@/types'
 
@@ -23,7 +23,6 @@ const NAV = [
     items: [
       { id:'clients', label:'Clients', Icon: Building },
       { id:'reports', label:'Reports', Icon: FileText },
-      { id:'inbox', label:'Inbox', Icon: Inbox },
     ]
   },
   {
@@ -91,10 +90,10 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
   }
 
   const ROLE_SCREENS: Record<string, string[]> = {
-    owner:    ['myday','planner','calendar','contentplan','clients','client-detail','reports','inbox','pipeline','leads','team','onboarding','performance','permissions','connections','automations','knowledge','attendance'],
-    manager:  ['myday','planner','calendar','contentplan','clients','client-detail','reports','inbox','pipeline','leads','team','onboarding','performance','knowledge','attendance'],
-    sales:    ['myday','inbox','clients','client-detail','reports','pipeline','leads','attendance'],
-    employee: ['myday','planner','calendar','contentplan','inbox','knowledge','attendance'],
+    owner:    ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','performance','permissions','connections','automations','knowledge','attendance'],
+    manager:  ['myday','planner','calendar','contentplan','clients','client-detail','reports','pipeline','leads','team','onboarding','performance','knowledge','attendance'],
+    sales:    ['myday','clients','client-detail','reports','pipeline','leads','attendance'],
+    employee: ['myday','planner','calendar','contentplan','knowledge','attendance'],
   }
   const allowed = (id: string) => (ROLE_SCREENS[role] || ROLE_SCREENS.employee).includes(id)
   const nav = (screen: Screen) => dispatch({ type:'SET_SCREEN', screen })

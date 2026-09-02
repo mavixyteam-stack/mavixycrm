@@ -13,7 +13,6 @@ import DayPlanner from '@/components/work/DayPlanner'
 import ClientsScreen from '@/components/accounts/ClientsScreen'
 import ClientDetail from '@/components/accounts/ClientDetail'
 import ReportsScreen from '@/components/accounts/ReportsScreen'
-import InboxScreen from '@/components/accounts/InboxScreen'
 import PipelineScreen from '@/components/sales/PipelineScreen'
 import LeadsScreen from '@/components/sales/LeadsScreen'
 import TeamScreen from '@/components/org/TeamScreen'
@@ -61,7 +60,6 @@ const SCREEN_PATHS: Record<string, Screen> = {
   '/content': 'contentplan',
   '/clients': 'clients',
   '/reports': 'reports',
-  '/inbox': 'inbox',
   '/pipeline': 'pipeline',
   '/leads': 'leads',
   '/team': 'team',
@@ -81,7 +79,6 @@ const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
   contentplan: '/content',
   clients: '/clients',
   reports: '/reports',
-  inbox: '/inbox',
   pipeline: '/pipeline',
   leads: '/leads',
   team: '/team',
@@ -98,21 +95,21 @@ const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
 const ROLE_SCREENS: Record<Role, Screen[]> = {
   owner: [
     'myday','planner','calendar','contentplan',
-    'clients','client-detail','reports','inbox',
+    'clients','client-detail','reports',
     'pipeline','leads',
     'team','performance','permissions','connections','automations','knowledge','attendance','onboarding',
   ],
   manager: [
     'myday','planner','calendar','contentplan',
-    'clients','client-detail','reports','inbox',
+    'clients','client-detail','reports',
     'pipeline','leads',
     'team','performance','knowledge','attendance','onboarding',
   ],
   sales: [
-    'myday','inbox','clients','client-detail','reports','pipeline','leads','attendance',
+    'myday','clients','client-detail','reports','pipeline','leads','attendance',
   ],
   employee: [
-    'myday','planner','calendar','contentplan','inbox','knowledge','attendance',
+    'myday','planner','calendar','contentplan','knowledge','attendance',
   ],
 }
 
@@ -228,7 +225,6 @@ function AppShell() {
       case 'clients':     return <ClientsScreen />
       case 'client-detail': return <ClientDetail />
       case 'reports':     return <ReportsScreen />
-      case 'inbox':       return <InboxScreen />
       case 'pipeline':    return <PipelineScreen />
       case 'leads':       return <LeadsScreen />
       case 'team':        return <TeamScreen />

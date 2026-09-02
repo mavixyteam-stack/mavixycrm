@@ -4,7 +4,7 @@ export type NavGroup = 'work' | 'accounts' | 'sales' | 'org'
 
 export type Screen =
   | 'myday' | 'planner' | 'calendar' | 'contentplan'
-  | 'clients' | 'client-detail' | 'reports' | 'inbox' | 'onboarding'
+  | 'clients' | 'client-detail' | 'reports' | 'onboarding'
   | 'pipeline' | 'leads'
   | 'team' | 'permissions' | 'performance' | 'connections' | 'automations' | 'knowledge'
   | 'attendance'
