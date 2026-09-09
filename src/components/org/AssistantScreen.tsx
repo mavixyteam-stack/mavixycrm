@@ -29,6 +29,33 @@ const SUGGESTED = [
   'Who worked the most this week?',
 ]
 
+// Rank voices so we default to the most natural one available and lean into a
+// calm, JARVIS-ish British/Indian register rather than the robotic default.
+function scoreVoice(v: SpeechSynthesisVoice): number {
+  const n = v.name.toLowerCase()
+  const l = v.lang.toLowerCase()
+  if (!l.startsWith('en')) return -1
+  let s = 0
+  if (/natural|neural|online|premium|enhanced/.test(n)) s += 60   // modern neural engines
+  if (/google/.test(n)) s += 45                                    // Google voices are excellent
+  if (/microsoft/.test(n)) s += 25
+  if (/\b(uk|gb)\b/.test(l) || /united kingdom|british|uk english/.test(n)) s += 22 // JARVIS register
+  if (/en-in/.test(l)) s += 14                                     // Indian English also great here
+  if (/male|daniel|arthur|george|guy|ryan|james|brian|oliver/.test(n)) s += 10
+  if (/samantha|daniel|serena|arthur|jenny|aria|libby|sonia|ryan/.test(n)) s += 8  // Apple/MS premium
+  if (v.default) s += 2
+  return s
+}
+
+// Trim engine noise from a voice name for the compact picker.
+function shortVoiceName(v: SpeechSynthesisVoice): string {
+  return v.name
+    .replace(/^(Google|Microsoft)\s+/i, '')
+    .replace(/\s*\((Natural|Online|Enhanced|Premium)\)/gi, '')
+    .replace(/\s*-\s*English.*/i, '')
+    .trim() || v.name
+}
+
 // Strip markdown + emoji so the spoken version sounds clean.
 function speakable(text: string): string {
   return text
@@ -56,6 +83,8 @@ export default function AssistantScreen() {
   const [speaking, setSpeaking] = useState(false)
   const [voiceOn, setVoiceOn] = useState(false)      // read replies aloud
   const [handsFree, setHandsFree] = useState(false)  // continuous conversation
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [voiceURI, setVoiceURI] = useState('')       // chosen voice (persisted)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const recogRef = useRef<SpeechRecognitionInstance | null>(null)
@@ -65,6 +94,7 @@ export default function AssistantScreen() {
   const listeningRef = useRef(false)
   const voiceOnRef = useRef(false)
   const handsFreeRef = useRef(false)
+  const voiceURIRef = useRef('')
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }) }, [msgs, loading, interim])
 
@@ -77,6 +107,8 @@ export default function AssistantScreen() {
   useEffect(() => {
     try {
       setVoiceOn(localStorage.getItem('mavixy_voice_on') === '1')
+      const uri = localStorage.getItem('mavixy_voice_uri') || ''
+      setVoiceURI(uri); voiceURIRef.current = uri
     } catch { /* ignore */ }
   }, [])
 
@@ -84,14 +116,13 @@ export default function AssistantScreen() {
   function pickVoice(): SpeechSynthesisVoice | null {
     const vs = voicesRef.current
     if (!vs.length) return null
-    return (
-      vs.find(v => /en-IN/i.test(v.lang)) ||
-      vs.find(v => /Google.*English/i.test(v.name)) ||
-      vs.find(v => /en-GB/i.test(v.lang)) ||
-      vs.find(v => /^en[-_]/i.test(v.lang)) ||
-      vs.find(v => /^en/i.test(v.lang)) ||
-      null
-    )
+    if (voiceURIRef.current) {
+      const chosen = vs.find(v => v.voiceURI === voiceURIRef.current)
+      if (chosen) return chosen
+    }
+    const en = vs.filter(v => /^en/i.test(v.lang))
+    if (!en.length) return null
+    return en.reduce((best, v) => (scoreVoice(v) > scoreVoice(best) ? v : best), en[0])
   }
 
   function stopSpeaking() {
@@ -99,22 +130,32 @@ export default function AssistantScreen() {
     setSpeaking(false)
   }
 
-  function speak(text: string) {
+  // Core speak — always speaks (used by both replies and the voice preview).
+  function utter(text: string, onDone?: () => void) {
     const canTTS = typeof window !== 'undefined' && 'speechSynthesis' in window
-    if (!voiceOnRef.current || !canTTS) {
-      if (handsFreeRef.current) startListening()
-      return
-    }
+    if (!canTTS) { onDone?.(); return }
     const clean = speakable(text)
-    if (!clean) { if (handsFreeRef.current) startListening(); return }
+    if (!clean) { onDone?.(); return }
     try { window.speechSynthesis.cancel() } catch { /* ignore */ }
     const u = new SpeechSynthesisUtterance(clean)
-    u.rate = 1.03; u.pitch = 1; u.lang = 'en-IN'
-    const v = pickVoice(); if (v) u.voice = v
+    // A calm, composed cadence — slightly slower and lower than default.
+    u.rate = 0.98; u.pitch = 0.92; u.volume = 1
+    const v = pickVoice()
+    if (v) { u.voice = v; u.lang = v.lang } else { u.lang = 'en-IN' }
     u.onstart = () => setSpeaking(true)
-    u.onend = () => { setSpeaking(false); if (handsFreeRef.current) startListening() }
-    u.onerror = () => setSpeaking(false)
+    u.onend = () => { setSpeaking(false); onDone?.() }
+    u.onerror = () => { setSpeaking(false); onDone?.() }
     window.speechSynthesis.speak(u)
+  }
+
+  // Speak a reply (respects the voice toggle; drives the hands-free loop).
+  function speak(text: string) {
+    if (!voiceOnRef.current) { if (handsFreeRef.current) startListening(); return }
+    utter(text, () => { if (handsFreeRef.current) startListening() })
+  }
+
+  function previewVoice() {
+    utter(`Systems online. Mavixy here — let's get to work.`)
   }
 
   // ── Speech-to-text ──────────────────────────────────────────────────────────
@@ -138,8 +179,16 @@ export default function AssistantScreen() {
     if (!SR) { setVoiceSupported(false); return }
     setVoiceSupported(true)
 
-    // Load TTS voices (async in most browsers).
-    const loadVoices = () => { try { voicesRef.current = window.speechSynthesis.getVoices() } catch { /* ignore */ } }
+    // Load TTS voices (async in most browsers) and expose the English ones,
+    // best-first, for the picker.
+    const loadVoices = () => {
+      try {
+        const all = window.speechSynthesis.getVoices()
+        voicesRef.current = all
+        const en = all.filter(v => /^en/i.test(v.lang)).sort((a, b) => scoreVoice(b) - scoreVoice(a))
+        setVoices(en)
+      } catch { /* ignore */ }
+    }
     loadVoices()
     if ('speechSynthesis' in window) window.speechSynthesis.onvoiceschanged = loadVoices
 
@@ -184,7 +233,13 @@ export default function AssistantScreen() {
     const next = !voiceOn
     setVoiceOn(next)
     try { localStorage.setItem('mavixy_voice_on', next ? '1' : '0') } catch { /* ignore */ }
-    if (!next) stopSpeaking()
+    if (!next) stopSpeaking(); else previewVoice()
+  }
+
+  function chooseVoice(uri: string) {
+    setVoiceURI(uri); voiceURIRef.current = uri
+    try { localStorage.setItem('mavixy_voice_uri', uri) } catch { /* ignore */ }
+    previewVoice()   // let them hear the new voice immediately
   }
 
   function toggleHandsFree() {
@@ -263,6 +318,16 @@ export default function AssistantScreen() {
         {/* Voice controls */}
         {voiceSupported && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {voices.length > 0 && (
+              <div style={{ position: 'relative' }}>
+                <select value={voiceURI} onChange={e => chooseVoice(e.target.value)} title="Choose Mavixy's voice"
+                  style={{ appearance: 'none', WebkitAppearance: 'none', maxWidth: 150, height: 38, background: '#fff', border: '1.5px solid var(--c-border)', borderRadius: 11, padding: '0 30px 0 12px', fontSize: 12.5, fontWeight: 600, color: 'var(--c-ink-2)', cursor: 'pointer' }}>
+                  <option value="">Auto (best)</option>
+                  {voices.map(v => <option key={v.voiceURI} value={v.voiceURI}>{shortVoiceName(v)} · {v.lang}</option>)}
+                </select>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-faint)" strokeWidth="2.4" strokeLinecap="round" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><path d="m6 9 6 6 6-6" /></svg>
+              </div>
+            )}
             <button onClick={toggleVoice} title={voiceOn ? 'Voice replies on' : 'Voice replies off'}
               style={{ width: 38, height: 38, borderRadius: 11, border: `1.5px solid ${voiceOn ? 'var(--c-accent)' : 'var(--c-border)'}`, background: voiceOn ? 'var(--c-accent)' : '#fff', color: voiceOn ? '#fff' : 'var(--c-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all .15s' }}>
               {voiceOn ? (
