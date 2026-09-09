@@ -1,6 +1,6 @@
 'use client'
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client, Notification, Journey } from '@/types'
+import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client, Notification, Journey, Proposal } from '@/types'
 import { createClient } from './supabase/client'
 import {
   loadWorkspace,
@@ -9,6 +9,7 @@ import {
   dbUpsertTask, dbUpsertDeal, dbDeleteDeal,
   dbUpsertAttendanceRequest, dbUpdateAttendanceRequest,
   dbUpsertJourney, dbDeleteJourney,
+  dbUpsertProposal, dbDeleteProposal,
   loadNotifications, markNotificationRead, markAllNotificationsRead, notifyUsers,
 } from './db'
 
@@ -25,6 +26,7 @@ interface AppState {
   attendanceRequests: AttendanceRequest[]
   deals: Deal[]
   journeys: Journey[]
+  proposals: Proposal[]
   notifications: Notification[]
   selectedClientId: string | null
   toast: string | null
@@ -46,7 +48,7 @@ type Action =
   | { type: 'SET_USER'; user: Profile }
   | { type: 'LOGOUT' }
   | { type: 'AUTH_LOADED' }
-  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendanceRequests: AttendanceRequest[]; journeys: Journey[] }
+  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendanceRequests: AttendanceRequest[]; journeys: Journey[]; proposals: Proposal[] }
   | { type: 'SET_PLAN_ITEMS'; items: PlanItem[] }
   | { type: 'UPSERT_PLAN_ITEM'; item: PlanItem }
   | { type: 'DELETE_PLAN_ITEM'; id: string }
@@ -63,6 +65,9 @@ type Action =
   | { type: 'SET_JOURNEYS'; journeys: Journey[] }
   | { type: 'UPSERT_JOURNEY'; journey: Journey }
   | { type: 'DELETE_JOURNEY'; id: string }
+  | { type: 'SET_PROPOSALS'; proposals: Proposal[] }
+  | { type: 'UPSERT_PROPOSAL'; proposal: Proposal }
+  | { type: 'DELETE_PROPOSAL'; id: string }
   | { type: 'DELETE_DEAL'; id: string }
   | { type: 'SET_ATTENDANCE'; attendance: AttendanceRecord[] }
   | { type: 'SET_NOTIFICATIONS'; notifications: Notification[] }
@@ -98,6 +103,7 @@ const initial: AppState = {
   attendanceRequests: [],
   deals: [],
   journeys: [],
+  proposals: [],
   notifications: [],
   selectedClientId: null,
   toast: null,
@@ -132,6 +138,7 @@ function reducer(state: AppState, action: Action): AppState {
       tasks: action.tasks,
       deals: action.deals,
       journeys: action.journeys,
+      proposals: action.proposals,
       users: action.users,
       attendanceRequests: action.attendanceRequests,
     }
@@ -158,6 +165,9 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_JOURNEYS': return { ...state, journeys: action.journeys }
     case 'UPSERT_JOURNEY': return { ...state, journeys: upsert(state.journeys, action.journey) }
     case 'DELETE_JOURNEY': return { ...state, journeys: state.journeys.filter(x => x.id !== action.id) }
+    case 'SET_PROPOSALS': return { ...state, proposals: action.proposals }
+    case 'UPSERT_PROPOSAL': return { ...state, proposals: upsert(state.proposals, action.proposal) }
+    case 'DELETE_PROPOSAL': return { ...state, proposals: state.proposals.filter(x => x.id !== action.id) }
     case 'SET_ATTENDANCE': return { ...state, attendance: action.attendance }
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.notifications }
     case 'ADD_NOTIFICATION':
@@ -275,6 +285,7 @@ async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
       tasks: data.tasks,
       deals: data.deals,
       journeys: data.journeys,
+      proposals: data.proposals,
       users: data.profiles,
       attendanceRequests: data.attendanceRequests,
     })
@@ -460,6 +471,24 @@ export function useDeleteJourney() {
   return useCallback(async (id: string) => {
     dispatch({ type: 'DELETE_JOURNEY', id })
     try { await dbDeleteJourney(id) } catch (e) { errToast('deleteJourney', e) }
+  }, [dispatch, errToast])
+}
+
+export function useUpsertProposal() {
+  const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
+  return useCallback(async (proposal: Proposal) => {
+    dispatch({ type: 'UPSERT_PROPOSAL', proposal })
+    try { await dbUpsertProposal(proposal) } catch (e) { errToast('upsertProposal', e) }
+  }, [dispatch, errToast])
+}
+
+export function useDeleteProposal() {
+  const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
+  return useCallback(async (id: string) => {
+    dispatch({ type: 'DELETE_PROPOSAL', id })
+    try { await dbDeleteProposal(id) } catch (e) { errToast('deleteProposal', e) }
   }, [dispatch, errToast])
 }
 

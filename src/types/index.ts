@@ -165,6 +165,38 @@ export interface Journey {
   updated_at?: string | null
 }
 
+export interface ProposalLineItem {
+  desc: string
+  qty: number
+  rate: number
+}
+
+export type ProposalStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejected'
+
+export interface Proposal {
+  id: string
+  journey_id?: string | null
+  token: string
+  title: string
+  company?: string | null
+  client_name?: string | null
+  intro?: string | null
+  line_items: ProposalLineItem[]
+  currency?: string | null
+  tax_percent?: number | null
+  discount?: number | null
+  total: number
+  terms?: string | null
+  valid_until?: string | null
+  status: ProposalStatus
+  created_by?: string | null
+  sent_at?: string | null
+  viewed_at?: string | null
+  accepted_at?: string | null
+  created_at: string
+  updated_at?: string | null
+}
+
 export type NotificationType = 'warning' | 'info' | 'success' | 'reminder' | 'request'
 
 export interface Notification {

@@ -7,7 +7,9 @@ import {
   JOURNEY_STAGES, LOST_STAGE, stageDef, stageIndex, nextStage, STAGE_PROBABILITY, inr,
   BILLING_OPTIONS, SERVICE_OPTIONS, SOURCE_OPTIONS,
 } from '@/lib/journey'
-import type { Journey, JourneyStage } from '@/types'
+import { PROPOSAL_STATUS, money } from '@/lib/proposal'
+import ProposalBuilder from './ProposalBuilder'
+import type { Journey, JourneyStage, Proposal } from '@/types'
 
 const todayStr = () => {
   const d = new Date()
@@ -38,10 +40,14 @@ export default function ClientJourney() {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [showLost, setShowLost] = useState(false)
+  const [proposalCtx, setProposalCtx] = useState<{ journey: Journey; existing: Proposal | null } | null>(null)
 
   const me = state.currentUser?.id
   const owners = state.users.filter(u => ['owner', 'manager', 'sales'].includes(u.role))
   const person = (id?: string | null) => state.users.find(u => u.id === id)
+  const latestProposal = (jid: string) => state.proposals
+    .filter(p => p.journey_id === jid)
+    .sort((a, b) => (b.created_at > a.created_at ? 1 : -1))[0]
 
   const all = state.journeys
   const visible = ownerFilter === 'all' ? all : all.filter(j => j.owner_id === ownerFilter)
@@ -195,6 +201,7 @@ export default function ClientJourney() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: j.next_step ? 8 : 0 }}>
                       {j.service && <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--c-ink-3)', background: 'var(--c-fill)', borderRadius: 6, padding: '2px 7px' }}>{j.service}</span>}
                       {j.billing && <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--c-faint)' }}>{j.billing}</span>}
+                      {(() => { const pr = latestProposal(j.id); if (!pr) return null; const st = PROPOSAL_STATUS[pr.status]; return <span style={{ fontSize: 10, fontWeight: 700, color: st.c, background: st.bg, borderRadius: 6, padding: '2px 7px' }}>📄 {st.label}</span> })()}
                     </div>
                     {j.next_step && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: overdue ? '#DC2626' : 'var(--c-subtle)', fontWeight: overdue ? 700 : 500 }}>
@@ -262,14 +269,23 @@ export default function ClientJourney() {
         <JourneyDetail
           j={detail}
           ownerName={person(detail.owner_id)?.name}
+          proposals={state.proposals.filter(p => p.journey_id === detail.id)}
           onClose={() => setDetailId(null)}
           onEdit={() => openEdit(detail)}
           onMove={(s) => moveStage(detail, s)}
           onLost={() => markLost(detail)}
           onReopen={() => reopen(detail)}
           onDelete={() => del(detail)}
+          onNewProposal={() => setProposalCtx({ journey: detail, existing: null })}
+          onOpenProposal={(p) => setProposalCtx({ journey: detail, existing: p })}
+          onCopyProposal={async (p) => { try { await navigator.clipboard.writeText(`${window.location.origin}/proposal/${p.token}`); toast('Share link copied ✓') } catch { toast('Copy failed') } }}
           onAction={(label) => toast(`${label} — coming in the next build 🚧`)}
         />
+      )}
+
+      {/* Proposal builder */}
+      {proposalCtx && (
+        <ProposalBuilder journey={proposalCtx.journey} existing={proposalCtx.existing} onClose={() => setProposalCtx(null)} />
       )}
 
       {/* Create / edit modal */}
@@ -288,10 +304,12 @@ export default function ClientJourney() {
 }
 
 // ─── Detail drawer ──────────────────────────────────────────────────────────
-function JourneyDetail({ j, ownerName, onClose, onEdit, onMove, onLost, onReopen, onDelete, onAction }: {
-  j: Journey; ownerName?: string
+function JourneyDetail({ j, ownerName, proposals, onClose, onEdit, onMove, onLost, onReopen, onDelete, onNewProposal, onOpenProposal, onCopyProposal, onAction }: {
+  j: Journey; ownerName?: string; proposals: Proposal[]
   onClose: () => void; onEdit: () => void; onMove: (s: JourneyStage) => void
-  onLost: () => void; onReopen: () => void; onDelete: () => void; onAction: (label: string) => void
+  onLost: () => void; onReopen: () => void; onDelete: () => void
+  onNewProposal: () => void; onOpenProposal: (p: Proposal) => void; onCopyProposal: (p: Proposal) => void
+  onAction: (label: string) => void
 }) {
   const def = stageDef(j.stage)
   const idx = stageIndex(j.stage)
@@ -332,11 +350,41 @@ function JourneyDetail({ j, ownerName, onClose, onEdit, onMove, onLost, onReopen
               <div style={{ fontSize: 10.5, fontWeight: 700, color: def.c, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Next move</div>
               <div style={{ fontSize: 13.5, color: 'var(--c-ink-2)', lineHeight: 1.5 }}>{def.hint}</div>
               {def.action && (
-                <button onClick={() => onAction(def.action!)}
+                <button onClick={() => def.key === 'proposal' ? onNewProposal() : onAction(def.action!)}
                   style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: def.c, color: '#fff', borderRadius: 9, padding: '7px 13px', fontWeight: 700, fontSize: 12.5, border: 'none', cursor: 'pointer' }}>
                   {def.action}
                 </button>
               )}
+            </div>
+
+            {/* Proposals */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--c-ghost)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Proposals</div>
+                <button onClick={onNewProposal} style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>+ New proposal</button>
+              </div>
+              {proposals.length === 0
+                ? <div style={{ fontSize: 13, color: 'var(--c-faint)' }}>No proposals yet. Build one to share a link the client can accept.</div>
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    {proposals.map(p => {
+                      const st = PROPOSAL_STATUS[p.status]
+                      return (
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--c-border-soft)', borderRadius: 10, padding: '9px 12px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--c-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                            <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 2 }}>{money(p.total, p.currency || 'INR')}</div>
+                          </div>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: st.c, background: st.bg, borderRadius: 6, padding: '3px 9px', flexShrink: 0 }}>{st.label}</span>
+                          <button onClick={() => onCopyProposal(p)} title="Copy share link" style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--c-fill)', border: 'none', cursor: 'pointer', color: 'var(--c-muted)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>
+                          </button>
+                          <button onClick={() => onOpenProposal(p)} title="Edit" style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-ink-3)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
             </div>
 
             {/* Facts grid */}

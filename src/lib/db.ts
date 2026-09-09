@@ -1,5 +1,5 @@
 import { createClient } from './supabase/client'
-import type { PlanItem, Task, Deal, Client, AttendanceRequest, Journey } from '@/types'
+import type { PlanItem, Task, Deal, Client, AttendanceRequest, Journey, Proposal } from '@/types'
 
 // ─── Server-side write helper (bypasses RLS via service role key) ─────────────
 
@@ -39,6 +39,7 @@ export async function loadWorkspace() {
     { data: profiles },
     { data: attReqs },
     { data: journeys },
+    { data: proposals },
   ] = await Promise.all([
     sb.from('clients').select('*').order('created_at'),
     sb.from('plan_items').select('*').order('created_at'),
@@ -46,8 +47,9 @@ export async function loadWorkspace() {
     sb.from('deals').select('*').order('created_at'),
     sb.from('profiles').select('*').order('created_at'),
     sb.from('attendance_requests').select('*').order('created_at', { ascending: false }),
-    // journeys may not exist until the migration runs — tolerate the error
+    // journeys / proposals may not exist until the migration runs — tolerate it
     sb.from('journeys').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
+    sb.from('proposals').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
   ])
   return {
     clients: clients || [],
@@ -57,6 +59,7 @@ export async function loadWorkspace() {
     profiles: profiles || [],
     attendanceRequests: attReqs || [],
     journeys: journeys || [],
+    proposals: proposals || [],
   }
 }
 
@@ -87,6 +90,36 @@ export async function dbUpsertJourney(j: Journey) {
 
 export async function dbDeleteJourney(id: string) {
   await apiDelete('journeys', id)
+}
+
+// ─── Proposals ────────────────────────────────────────────────────────────────
+
+export async function dbUpsertProposal(p: Proposal) {
+  await apiUpsert('proposals', {
+    id: p.id,
+    journey_id: p.journey_id || null,
+    token: p.token,
+    title: p.title,
+    company: p.company || null,
+    client_name: p.client_name || null,
+    intro: p.intro || null,
+    line_items: p.line_items || [],
+    currency: p.currency || 'INR',
+    tax_percent: p.tax_percent ?? 0,
+    discount: p.discount ?? 0,
+    total: p.total || 0,
+    terms: p.terms || null,
+    valid_until: p.valid_until || null,
+    status: p.status,
+    created_by: p.created_by || null,
+    sent_at: p.sent_at || null,
+    accepted_at: p.accepted_at || null,
+    updated_at: new Date().toISOString(),
+  })
+}
+
+export async function dbDeleteProposal(id: string) {
+  await apiDelete('proposals', id)
 }
 
 // ─── Plan items ───────────────────────────────────────────────────────────────

@@ -171,7 +171,39 @@ CREATE TABLE IF NOT EXISTS journeys (
 CREATE INDEX IF NOT EXISTS journeys_stage_idx ON journeys (stage);
 ALTER TABLE journeys ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "mavixy_journeys" ON journeys;
-CREATE POLICY "mavixy_journeys" ON journeys FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+CREATE POLICY "mavixy_journeys" ON journeys FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Proposals: line-item proposals with a shareable public link the client accepts
+CREATE TABLE IF NOT EXISTS proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  journey_id UUID,
+  token TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  company TEXT,
+  client_name TEXT,
+  intro TEXT,
+  line_items JSONB DEFAULT '[]'::jsonb,
+  currency TEXT DEFAULT 'INR',
+  tax_percent NUMERIC DEFAULT 0,
+  discount NUMERIC DEFAULT 0,
+  total NUMERIC DEFAULT 0,
+  terms TEXT,
+  valid_until DATE,
+  status TEXT NOT NULL DEFAULT 'draft',
+  created_by UUID,
+  sent_at TIMESTAMPTZ,
+  viewed_at TIMESTAMPTZ,
+  accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS proposals_journey_idx ON proposals (journey_id);
+-- RLS: only authenticated app users read/write directly. The public proposal
+-- page reads + accepts through service-role server routes, so anon has no
+-- direct table access.
+ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mavixy_proposals" ON proposals;
+CREATE POLICY "mavixy_proposals" ON proposals FOR ALL TO authenticated USING (true) WITH CHECK (true);`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
