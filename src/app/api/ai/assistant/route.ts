@@ -6,6 +6,18 @@ import { completeJSON } from '@/lib/groq'
 const pad = (n: number) => String(n).padStart(2, '0')
 function ymd(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 
+// Infer the content category + type for a plan_item from the task title so
+// agent-created content lands on the calendar with a sensible label.
+function contentMetaFor(title: string): { cat: 'social' | 'performance' | 'seo'; type: string } {
+  const t = (title || '').toLowerCase()
+  if (/carousel/.test(t)) return { cat: 'social', type: 'Carousel' }
+  if (/stor(y|ies)/.test(t)) return { cat: 'social', type: 'Story' }
+  if (/reel|video|short|clip/.test(t)) return { cat: 'social', type: 'Reel' }
+  if (/ugc/.test(t)) return { cat: 'social', type: 'UGC' }
+  if (/blog|article|seo/.test(t)) return { cat: 'seo', type: 'Blog Article' }
+  return { cat: 'social', type: 'Static Post' }
+}
+
 // JARVIS — the owner's AI. Gathers a compact snapshot of the whole company
 // and answers the owner's question grounded in that live data.
 export async function POST(req: NextRequest) {
@@ -140,32 +152,64 @@ ${snapshot}
       const client = a.client ? (clients || []).find(c => c.name?.toLowerCase() === a.client!.toLowerCase()) : null
       const dept = a.department && ['Creative', 'Digital Marketing', 'Sales', 'General'].includes(a.department) ? a.department : (assignee.department || 'Creative')
       const due = a.due && /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : null
+      const first = assignee.name.split(' ')[0]
 
-      const { error } = await db.from('tasks').insert({
-        title: a.title,
-        client_id: client?.id || null,
-        assignee_id: assignee.id,
-        type: dept,
-        department: dept,
-        priority: ['Low', 'Medium', 'High'].includes(a.priority || '') ? a.priority : 'Medium',
-        due,
-        done: false,
-        status: 'todo',
-        refs: [],   // refs is NOT NULL in the tasks table
-      })
+      // Creative work is content — it belongs on the Content Calendar, not the
+      // generic task list. So we create a plan_item (which also surfaces in the
+      // assignee's My Day). Everything else stays a plain task.
+      const isContent = dept === 'Creative'
+
+      let error: { message: string } | null = null
+      if (isContent) {
+        const contentMeta = contentMetaFor(a.title)
+        // The calendar/planner bucket content by a NON-padded `${year}-${month}`
+        // key derived from the post date, so match that exactly.
+        const post = due ? new Date(due + 'T00:00:00') : now
+        const monthKey = `${post.getFullYear()}-${post.getMonth() + 1}`
+        const day = due ? post.getDate() : null
+        const res = await db.from('plan_items').insert({
+          month: monthKey,
+          client_id: client?.id || null,
+          cat: contentMeta.cat,
+          type: contentMeta.type,
+          title: a.title,
+          brief: '',
+          refs: [],
+          assignee_id: assignee.id,
+          effort: 2,
+          day,
+          status: 'planned',
+        })
+        error = res.error
+      } else {
+        const res = await db.from('tasks').insert({
+          title: a.title,
+          client_id: client?.id || null,
+          assignee_id: assignee.id,
+          type: dept,
+          department: dept,
+          priority: ['Low', 'Medium', 'High'].includes(a.priority || '') ? a.priority : 'Medium',
+          due,
+          done: false,
+          status: 'todo',
+          refs: [],   // refs is NOT NULL in the tasks table
+        })
+        error = res.error
+      }
 
       if (error) {
-        reply = `I hit a snag creating that task: ${error.message}`
+        reply = `I hit a snag creating that ${isContent ? 'content piece' : 'task'}: ${error.message}`
       } else {
         created = true
         await createNotifications(db, [assignee.id], {
-          title: 'New task assigned',
-          text: `${caller.name?.split(' ')[0] || 'The owner'} assigned you a task${client ? ` for ${client.name}` : ''}: ${a.title}${due ? ` (due ${due})` : ''}`,
+          title: isContent ? 'New content assigned' : 'New task assigned',
+          text: `${caller.name?.split(' ')[0] || 'The owner'} assigned you ${isContent ? 'a content piece' : 'a task'}${client ? ` for ${client.name}` : ''}: ${a.title}${due ? ` (${isContent ? 'post' : 'due'} ${due})` : ''}`,
           type: 'info',
-          link: dept === 'Digital Marketing' ? 'dmboard' : 'myday',
+          link: isContent ? 'calendar' : dept === 'Digital Marketing' ? 'dmboard' : 'myday',
         })
-        const first = assignee.name.split(' ')[0]
-        reply = `✅ Done — created "${a.title}"${client ? ` for ${client.name}` : ''} for ${first}${due ? `, due ${due}` : ''}. ${first} has been notified.`
+        reply = isContent
+          ? `✅ Done — added "${a.title}"${client ? ` for ${client.name}` : ''} to the content calendar for ${first}${due ? `, posting ${due}` : ''}. ${first} has been notified.`
+          : `✅ Done — created "${a.title}"${client ? ` for ${client.name}` : ''} for ${first}${due ? `, due ${due}` : ''}. ${first} has been notified.`
       }
     }
   }
