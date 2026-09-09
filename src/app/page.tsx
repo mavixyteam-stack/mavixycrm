@@ -26,6 +26,7 @@ import AttendanceScreen from '@/components/org/AttendanceScreen'
 import OnboardingScreen from '@/components/org/OnboardingScreen'
 import AssistantScreen from '@/components/org/AssistantScreen'
 import { Sparkle } from '@/components/ui/Icon'
+import { canAccess, defaultScreen } from '@/lib/access'
 import type { Screen, Role } from '@/types'
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
@@ -97,38 +98,6 @@ const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
   assistant: '/ask',
 }
 
-// ─── RBAC matrix ─────────────────────────────────────────────────────────────
-const ROLE_SCREENS: Record<Role, Screen[]> = {
-  owner: [
-    'myday','planner','calendar','contentplan',
-    'clients','client-detail','reports',
-    'pipeline','leads',
-    'team','performance','permissions','connections','automations','knowledge','attendance','onboarding','assistant',
-  ],
-  manager: [
-    'myday','planner','calendar','contentplan',
-    'clients','client-detail','reports',
-    'pipeline','leads',
-    'team','performance','knowledge','attendance','onboarding','assistant',
-  ],
-  sales: [
-    'myday','clients','client-detail','reports','pipeline','leads','attendance',
-  ],
-  employee: [
-    'myday','calendar','contentplan','knowledge','attendance',
-  ],
-}
-
-function canAccess(role: Role, screen: Screen, department?: string | null): boolean {
-  // The Digital Marketing board is for leadership + the Digital Marketing team.
-  if (screen === 'dmboard') return ['owner', 'manager'].includes(role) || department === 'Digital Marketing'
-  return ROLE_SCREENS[role]?.includes(screen) ?? false
-}
-
-function defaultScreen(role: Role): Screen {
-  return ROLE_SCREENS[role][0] || 'myday'
-}
-
 // ─── Access denied wall ───────────────────────────────────────────────────────
 function AccessDenied({ screen, role }: { screen: string; role: string }) {
   return (
@@ -158,7 +127,7 @@ function AppShell() {
   // Redirect to allowed screen if current screen is blocked
   useEffect(() => {
     if (state.isLoggedIn && !canAccess(role, state.screen, department)) {
-      dispatch({ type: 'SET_SCREEN', screen: defaultScreen(role) })
+      dispatch({ type: 'SET_SCREEN', screen: defaultScreen() })
     }
   }, [role, department, state.screen, state.isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
 

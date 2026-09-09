@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { useApp, useToast } from '@/lib/store'
 import { Sparkle, Calendar, BarChart, Building, Users, TrendUp, Book, Settings, Zap, FileText, Globe, LogOut, X } from '@/components/ui/Icon'
 import { ModalPortal } from '@/components/ui/ModalPortal'
-import type { Screen } from '@/types'
+import { canAccess } from '@/lib/access'
+import type { Screen, Role } from '@/types'
 
 const COLORS = ['#0EA5A4','#FB7185','#6366F1','#F4B740','#8B5CF6','#2563EB','#10B981','#EF4444','#FF5C1F']
 
@@ -91,16 +92,8 @@ export default function Sidebar({ onLogout }: { onLogout?: () => void }) {
     setSaving(false)
   }
 
-  const ROLE_SCREENS: Record<string, string[]> = {
-    owner:    ['myday','planner','calendar','contentplan','dmboard','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','permissions','connections','automations','knowledge','attendance'],
-    manager:  ['myday','planner','calendar','contentplan','dmboard','clients','client-detail','reports','pipeline','leads','team','onboarding','assistant','performance','knowledge','attendance'],
-    sales:    ['myday','clients','client-detail','reports','pipeline','leads','attendance'],
-    employee: ['myday','calendar','contentplan','knowledge','attendance'],
-  }
   const dept = state.currentUser?.department
-  const allowed = (id: string) => id === 'dmboard'
-    ? (['owner', 'manager'].includes(role) || dept === 'Digital Marketing')
-    : (ROLE_SCREENS[role] || ROLE_SCREENS.employee).includes(id)
+  const allowed = (id: string) => canAccess(role as Role, id as Screen, dept)
   const nav = (screen: Screen) => dispatch({ type:'SET_SCREEN', screen })
 
   return (
