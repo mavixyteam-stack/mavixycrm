@@ -104,22 +104,24 @@ export async function POST(req: NextRequest) {
 
 You do two things:
 1) ANSWER questions about the company using ONLY the live snapshot below — specific, names people/clients/numbers, sharp and concise, ₹ for money.
-2) CREATE A TASK when the owner tells you to assign work (e.g. "let Jigar make a video for Lumio by tomorrow", "assign an SEO audit to Rahul").
+2) ASSIGN WORK when the owner tells you to. You can create ONE or SEVERAL pieces of work in a single message (e.g. "let Jigar make a video for Lumio by tomorrow", "give Rahul an SEO audit and Priya a carousel for Acme this week").
 
 You MUST reply as a single JSON object with this exact shape:
 {
   "reply": "<your short message to the owner>",
-  "action": null OR {
-    "type": "create_task",
-    "assignee": "<exact full name from the TEAM list>",
-    "title": "<clear task title>",
-    "client": "<exact client name from CLIENTS, or null>",
-    "due": "<YYYY-MM-DD, or null>",
-    "priority": "Low" | "Medium" | "High",
-    "department": "Creative" | "Digital Marketing" | "Sales" | "General"
-  }
+  "actions": [] OR [
+    {
+      "type": "create_task",
+      "assignee": "<exact full name from the TEAM list>",
+      "title": "<clear task title>",
+      "client": "<exact client name from CLIENTS, or null>",
+      "due": "<YYYY-MM-DD, or null>",
+      "priority": "Low" | "Medium" | "High",
+      "department": "Creative" | "Digital Marketing" | "Sales" | "General"
+    }
+  ]
 }
-Rules for actions: use an EXACT name from TEAM for "assignee" (team: ${teamNames}); use an EXACT name from CLIENTS for "client" or null (clients: ${clientList}); resolve relative dates yourself (tomorrow = the day after ${today}); pick department from the work (a video/reel/post = Creative; SEO/ads/analytics = Digital Marketing). If you can't tell who to assign, set "action" to null and ask who in "reply". For pure questions, set "action" to null and put the answer in "reply".
+Put ONE object in "actions" per distinct piece of work — "give Jigar a reel and Rahul an SEO audit" is TWO objects. Rules for actions: use an EXACT name from TEAM for "assignee" (team: ${teamNames}); use an EXACT name from CLIENTS for "client" or null (clients: ${clientList}); resolve relative dates yourself (tomorrow = the day after ${today}); pick department from the work (a video/reel/post/carousel/story = Creative; SEO/ads/analytics = Digital Marketing). If you can't tell who to assign one item to, leave it out of "actions" and ask who in "reply". For pure questions, use "actions": [] and put the answer in "reply".
 
 === LIVE COMPANY SNAPSHOT ===
 ${snapshot}
@@ -127,7 +129,8 @@ ${snapshot}
 
   const prompt = `${historyText ? `Recent conversation:\n${historyText}\n\n` : ''}Owner: ${question.trim()}\n\nRespond with the JSON object.`
 
-  let parsed: { reply?: string; action?: { type?: string; assignee?: string; title?: string; client?: string | null; due?: string | null; priority?: string; department?: string } | null }
+  type CreateAction = { type?: string; assignee?: string; title?: string; client?: string | null; due?: string | null; priority?: string; department?: string }
+  let parsed: { reply?: string; action?: CreateAction | null; actions?: CreateAction[] | null }
   try {
     const raw = await completeJSON(prompt, system)
     parsed = JSON.parse(raw)
@@ -135,83 +138,80 @@ ${snapshot}
     return NextResponse.json({ error: e instanceof Error ? e.message : 'AI unavailable' }, { status: 500 })
   }
 
-  let reply = parsed.reply || ''
-  let created = false
+  // JARVIS can act on one OR several instructions in a single message.
+  const actions: CreateAction[] = Array.isArray(parsed.actions)
+    ? parsed.actions
+    : (parsed.action ? [parsed.action] : [])
 
-  const a = parsed.action
-  if (a && a.type === 'create_task' && a.title) {
+  const ownerFirst = caller.name?.split(' ')[0] || 'The owner'
+
+  // Create a single task / content piece from one action; returns a human line.
+  async function runCreate(a: CreateAction): Promise<{ ok: boolean; line: string }> {
+    if (!a || a.type !== 'create_task' || !a.title) return { ok: false, line: '' }
     // Resolve the assignee by name (exact, then first-name, then contains)
     const want = (a.assignee || '').trim().toLowerCase()
     const assignee = (profiles || []).find(p => p.name?.toLowerCase() === want)
       || (profiles || []).find(p => p.name?.toLowerCase().split(' ')[0] === want.split(' ')[0] && want)
       || (profiles || []).find(p => want && p.name?.toLowerCase().includes(want))
+    if (!assignee) return { ok: false, line: `⚠️ I couldn't tell who "${a.assignee || 'that'}" is for "${a.title}" — who should take it?` }
 
-    if (!assignee) {
-      reply = reply || `I couldn't tell who "${a.assignee || 'that'}" is on the team. Who should I assign it to?`
+    const client = a.client ? (clients || []).find(c => c.name?.toLowerCase() === a.client!.toLowerCase()) : null
+    const dept = a.department && ['Creative', 'Digital Marketing', 'Sales', 'General'].includes(a.department) ? a.department : (assignee.department || 'Creative')
+    const due = a.due && /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : null
+    const first = assignee.name.split(' ')[0]
+
+    // Creative work is content — it belongs on the Content Calendar, not the
+    // generic task list (a plan_item also surfaces in the assignee's My Day).
+    const isContent = dept === 'Creative'
+
+    let error: { message: string } | null = null
+    if (isContent) {
+      const meta = contentMetaFor(a.title)
+      // The calendar/planner bucket content by a NON-padded `${year}-${month}`
+      // key derived from the post date, so match that exactly.
+      const post = due ? new Date(due + 'T00:00:00') : now
+      const monthKey = `${post.getFullYear()}-${post.getMonth() + 1}`
+      const day = due ? post.getDate() : null
+      const res = await db.from('plan_items').insert({
+        month: monthKey, client_id: client?.id || null, cat: meta.cat, type: meta.type,
+        title: a.title, brief: '', refs: [], assignee_id: assignee.id, effort: 2, day, status: 'planned',
+      })
+      error = res.error
     } else {
-      const client = a.client ? (clients || []).find(c => c.name?.toLowerCase() === a.client!.toLowerCase()) : null
-      const dept = a.department && ['Creative', 'Digital Marketing', 'Sales', 'General'].includes(a.department) ? a.department : (assignee.department || 'Creative')
-      const due = a.due && /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : null
-      const first = assignee.name.split(' ')[0]
-
-      // Creative work is content — it belongs on the Content Calendar, not the
-      // generic task list. So we create a plan_item (which also surfaces in the
-      // assignee's My Day). Everything else stays a plain task.
-      const isContent = dept === 'Creative'
-
-      let error: { message: string } | null = null
-      if (isContent) {
-        const contentMeta = contentMetaFor(a.title)
-        // The calendar/planner bucket content by a NON-padded `${year}-${month}`
-        // key derived from the post date, so match that exactly.
-        const post = due ? new Date(due + 'T00:00:00') : now
-        const monthKey = `${post.getFullYear()}-${post.getMonth() + 1}`
-        const day = due ? post.getDate() : null
-        const res = await db.from('plan_items').insert({
-          month: monthKey,
-          client_id: client?.id || null,
-          cat: contentMeta.cat,
-          type: contentMeta.type,
-          title: a.title,
-          brief: '',
-          refs: [],
-          assignee_id: assignee.id,
-          effort: 2,
-          day,
-          status: 'planned',
-        })
-        error = res.error
-      } else {
-        const res = await db.from('tasks').insert({
-          title: a.title,
-          client_id: client?.id || null,
-          assignee_id: assignee.id,
-          type: dept,
-          department: dept,
-          priority: ['Low', 'Medium', 'High'].includes(a.priority || '') ? a.priority : 'Medium',
-          due,
-          done: false,
-          status: 'todo',
-          refs: [],   // refs is NOT NULL in the tasks table
-        })
-        error = res.error
-      }
-
-      if (error) {
-        reply = `I hit a snag creating that ${isContent ? 'content piece' : 'task'}: ${error.message}`
-      } else {
-        created = true
-        await createNotifications(db, [assignee.id], {
-          title: isContent ? 'New content assigned' : 'New task assigned',
-          text: `${caller.name?.split(' ')[0] || 'The owner'} assigned you ${isContent ? 'a content piece' : 'a task'}${client ? ` for ${client.name}` : ''}: ${a.title}${due ? ` (${isContent ? 'post' : 'due'} ${due})` : ''}`,
-          type: 'info',
-          link: isContent ? 'calendar' : dept === 'Digital Marketing' ? 'dmboard' : 'myday',
-        })
-        reply = isContent
-          ? `✅ Done — added "${a.title}"${client ? ` for ${client.name}` : ''} to the content calendar for ${first}${due ? `, posting ${due}` : ''}. ${first} has been notified.`
-          : `✅ Done — created "${a.title}"${client ? ` for ${client.name}` : ''} for ${first}${due ? `, due ${due}` : ''}. ${first} has been notified.`
-      }
+      const res = await db.from('tasks').insert({
+        title: a.title, client_id: client?.id || null, assignee_id: assignee.id, type: dept, department: dept,
+        priority: ['Low', 'Medium', 'High'].includes(a.priority || '') ? a.priority : 'Medium',
+        due, done: false, status: 'todo', refs: [],   // refs is NOT NULL in the tasks table
+      })
+      error = res.error
     }
+    if (error) return { ok: false, line: `⚠️ Couldn't create "${a.title}": ${error.message}` }
+
+    await createNotifications(db, [assignee.id], {
+      title: isContent ? 'New content assigned' : 'New task assigned',
+      text: `${ownerFirst} assigned you ${isContent ? 'a content piece' : 'a task'}${client ? ` for ${client.name}` : ''}: ${a.title}${due ? ` (${isContent ? 'post' : 'due'} ${due})` : ''}`,
+      type: 'info',
+      link: isContent ? 'calendar' : dept === 'Digital Marketing' ? 'dmboard' : 'myday',
+    })
+    return {
+      ok: true,
+      line: isContent
+        ? `✅ Added "${a.title}"${client ? ` for ${client.name}` : ''} to the content calendar for ${first}${due ? `, posting ${due}` : ''} — ${first} notified.`
+        : `✅ Created "${a.title}"${client ? ` for ${client.name}` : ''} for ${first}${due ? `, due ${due}` : ''} — ${first} notified.`,
+    }
+  }
+
+  let reply = parsed.reply || ''
+  let created = false
+  if (actions.length) {
+    const lines: string[] = []
+    for (const a of actions) {
+      const r = await runCreate(a)
+      if (r.line) lines.push(r.line)
+      if (r.ok) created = true
+    }
+    // When we actually did things, the action results ARE the reply.
+    if (lines.length) reply = lines.join('\n')
   }
 
   return NextResponse.json({ ok: true, answer: reply || 'Done.', created })
