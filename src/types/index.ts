@@ -5,7 +5,7 @@ export type NavGroup = 'work' | 'accounts' | 'sales' | 'org'
 export type Screen =
   | 'myday' | 'planner' | 'calendar' | 'contentplan' | 'dmboard'
   | 'clients' | 'client-detail' | 'reports' | 'onboarding'
-  | 'pipeline' | 'leads'
+  | 'pipeline' | 'leads' | 'journey'
   | 'team' | 'permissions' | 'performance' | 'connections' | 'automations' | 'knowledge' | 'assistant'
   | 'attendance'
 
@@ -137,6 +137,32 @@ export interface Deal {
   follow_up_date?: string | null
   initials?: string
   color?: string
+}
+
+// ─── Client journey (end-to-end revenue lifecycle) ────────────────────────────
+export type JourneyStage =
+  | 'lead' | 'prospect' | 'pitch' | 'proposal' | 'contract' | 'onboarding' | 'active' | 'lost'
+
+export interface Journey {
+  id: string
+  name: string                 // primary contact / opportunity name
+  company: string
+  contact_email?: string | null
+  contact_phone?: string | null
+  stage: JourneyStage
+  value: number                // deal value or monthly amount (₹)
+  billing?: string | null      // one-time | monthly | retainer
+  source?: string | null
+  service?: string | null      // what they want (Social, Ads, SEO, Full-service…)
+  owner_id?: string | null     // account owner (profile id)
+  probability?: number | null
+  notes?: string | null
+  next_step?: string | null
+  next_step_date?: string | null
+  client_id?: string | null    // linked client once onboarded/active
+  lost_reason?: string | null
+  created_at: string
+  updated_at?: string | null
 }
 
 export type NotificationType = 'warning' | 'info' | 'success' | 'reminder' | 'request'

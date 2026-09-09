@@ -1,5 +1,5 @@
 import { createClient } from './supabase/client'
-import type { PlanItem, Task, Deal, Client, AttendanceRequest } from '@/types'
+import type { PlanItem, Task, Deal, Client, AttendanceRequest, Journey } from '@/types'
 
 // ─── Server-side write helper (bypasses RLS via service role key) ─────────────
 
@@ -38,6 +38,7 @@ export async function loadWorkspace() {
     { data: deals },
     { data: profiles },
     { data: attReqs },
+    { data: journeys },
   ] = await Promise.all([
     sb.from('clients').select('*').order('created_at'),
     sb.from('plan_items').select('*').order('created_at'),
@@ -45,6 +46,8 @@ export async function loadWorkspace() {
     sb.from('deals').select('*').order('created_at'),
     sb.from('profiles').select('*').order('created_at'),
     sb.from('attendance_requests').select('*').order('created_at', { ascending: false }),
+    // journeys may not exist until the migration runs — tolerate the error
+    sb.from('journeys').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
   ])
   return {
     clients: clients || [],
@@ -53,7 +56,37 @@ export async function loadWorkspace() {
     deals: deals || [],
     profiles: profiles || [],
     attendanceRequests: attReqs || [],
+    journeys: journeys || [],
   }
+}
+
+// ─── Client journeys ──────────────────────────────────────────────────────────
+
+export async function dbUpsertJourney(j: Journey) {
+  await apiUpsert('journeys', {
+    id: j.id,
+    name: j.name,
+    company: j.company,
+    contact_email: j.contact_email || null,
+    contact_phone: j.contact_phone || null,
+    stage: j.stage,
+    value: j.value || 0,
+    billing: j.billing || null,
+    source: j.source || null,
+    service: j.service || null,
+    owner_id: j.owner_id || null,
+    probability: j.probability ?? null,
+    notes: j.notes || null,
+    next_step: j.next_step || null,
+    next_step_date: j.next_step_date || null,
+    client_id: j.client_id || null,
+    lost_reason: j.lost_reason || null,
+    updated_at: new Date().toISOString(),
+  })
+}
+
+export async function dbDeleteJourney(id: string) {
+  await apiDelete('journeys', id)
 }
 
 // ─── Plan items ───────────────────────────────────────────────────────────────

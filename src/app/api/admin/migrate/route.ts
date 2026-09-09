@@ -143,7 +143,35 @@ CREATE TABLE IF NOT EXISTS work_logs (
 CREATE INDEX IF NOT EXISTS work_logs_user_date_idx ON work_logs (user_id, date);
 ALTER TABLE work_logs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "mavixy_work_logs" ON work_logs;
-CREATE POLICY "mavixy_work_logs" ON work_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+CREATE POLICY "mavixy_work_logs" ON work_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Client journey: the end-to-end revenue lifecycle record
+--   lead → prospect → pitch → proposal → contract → onboarding → active (or lost)
+CREATE TABLE IF NOT EXISTS journeys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  company TEXT,
+  contact_email TEXT,
+  contact_phone TEXT,
+  stage TEXT NOT NULL DEFAULT 'lead',
+  value NUMERIC DEFAULT 0,
+  billing TEXT,
+  source TEXT,
+  service TEXT,
+  owner_id UUID,
+  probability INT,
+  notes TEXT,
+  next_step TEXT,
+  next_step_date DATE,
+  client_id UUID,
+  lost_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS journeys_stage_idx ON journeys (stage);
+ALTER TABLE journeys ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mavixy_journeys" ON journeys;
+CREATE POLICY "mavixy_journeys" ON journeys FOR ALL TO authenticated USING (true) WITH CHECK (true);`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

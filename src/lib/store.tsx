@@ -1,6 +1,6 @@
 'use client'
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client, Notification } from '@/types'
+import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client, Notification, Journey } from '@/types'
 import { createClient } from './supabase/client'
 import {
   loadWorkspace,
@@ -8,6 +8,7 @@ import {
   dbUpsertClient, dbDeleteClient,
   dbUpsertTask, dbUpsertDeal, dbDeleteDeal,
   dbUpsertAttendanceRequest, dbUpdateAttendanceRequest,
+  dbUpsertJourney, dbDeleteJourney,
   loadNotifications, markNotificationRead, markAllNotificationsRead, notifyUsers,
 } from './db'
 
@@ -23,6 +24,7 @@ interface AppState {
   attendance: AttendanceRecord[]
   attendanceRequests: AttendanceRequest[]
   deals: Deal[]
+  journeys: Journey[]
   notifications: Notification[]
   selectedClientId: string | null
   toast: string | null
@@ -44,7 +46,7 @@ type Action =
   | { type: 'SET_USER'; user: Profile }
   | { type: 'LOGOUT' }
   | { type: 'AUTH_LOADED' }
-  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendanceRequests: AttendanceRequest[] }
+  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendanceRequests: AttendanceRequest[]; journeys: Journey[] }
   | { type: 'SET_PLAN_ITEMS'; items: PlanItem[] }
   | { type: 'UPSERT_PLAN_ITEM'; item: PlanItem }
   | { type: 'DELETE_PLAN_ITEM'; id: string }
@@ -58,6 +60,9 @@ type Action =
   | { type: 'DELETE_USER'; id: string }
   | { type: 'SET_DEALS'; deals: Deal[] }
   | { type: 'UPSERT_DEAL'; deal: Deal }
+  | { type: 'SET_JOURNEYS'; journeys: Journey[] }
+  | { type: 'UPSERT_JOURNEY'; journey: Journey }
+  | { type: 'DELETE_JOURNEY'; id: string }
   | { type: 'DELETE_DEAL'; id: string }
   | { type: 'SET_ATTENDANCE'; attendance: AttendanceRecord[] }
   | { type: 'SET_NOTIFICATIONS'; notifications: Notification[] }
@@ -92,6 +97,7 @@ const initial: AppState = {
   attendance: [],
   attendanceRequests: [],
   deals: [],
+  journeys: [],
   notifications: [],
   selectedClientId: null,
   toast: null,
@@ -125,6 +131,7 @@ function reducer(state: AppState, action: Action): AppState {
       planItems: action.planItems,
       tasks: action.tasks,
       deals: action.deals,
+      journeys: action.journeys,
       users: action.users,
       attendanceRequests: action.attendanceRequests,
     }
@@ -148,6 +155,9 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_DEALS': return { ...state, deals: action.deals }
     case 'UPSERT_DEAL': return { ...state, deals: upsert(state.deals, action.deal) }
     case 'DELETE_DEAL': return { ...state, deals: state.deals.filter(x => x.id !== action.id) }
+    case 'SET_JOURNEYS': return { ...state, journeys: action.journeys }
+    case 'UPSERT_JOURNEY': return { ...state, journeys: upsert(state.journeys, action.journey) }
+    case 'DELETE_JOURNEY': return { ...state, journeys: state.journeys.filter(x => x.id !== action.id) }
     case 'SET_ATTENDANCE': return { ...state, attendance: action.attendance }
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.notifications }
     case 'ADD_NOTIFICATION':
@@ -264,6 +274,7 @@ async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
       planItems: data.planItems,
       tasks: data.tasks,
       deals: data.deals,
+      journeys: data.journeys,
       users: data.profiles,
       attendanceRequests: data.attendanceRequests,
     })
@@ -420,6 +431,36 @@ export function useUpsertDeal() {
       })
     }
   }, [state, dispatch, errToast])
+}
+
+export function useUpsertJourney() {
+  const { state, dispatch } = useApp()
+  const errToast = useDbErrorToast()
+  return useCallback(async (journey: Journey) => {
+    const prev = state.journeys.find(j => j.id === journey.id)
+    const me = state.currentUser?.id
+    const newlyAssigned = !!journey.owner_id && journey.owner_id !== me && (!prev || prev.owner_id !== journey.owner_id)
+    dispatch({ type: 'UPSERT_JOURNEY', journey })
+    try { await dbUpsertJourney(journey) } catch (e) { errToast('upsertJourney', e) }
+    if (newlyAssigned && journey.owner_id) {
+      const assigner = state.currentUser?.name?.split(' ')[0] || 'Someone'
+      notifyUsers([journey.owner_id], {
+        title: 'Account assigned',
+        text: `${assigner} put you on ${journey.company || journey.name}`,
+        type: 'info',
+        link: 'journey',
+      })
+    }
+  }, [state, dispatch, errToast])
+}
+
+export function useDeleteJourney() {
+  const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
+  return useCallback(async (id: string) => {
+    dispatch({ type: 'DELETE_JOURNEY', id })
+    try { await dbDeleteJourney(id) } catch (e) { errToast('deleteJourney', e) }
+  }, [dispatch, errToast])
 }
 
 export function useDeleteDeal() {

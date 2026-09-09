@@ -10,13 +10,13 @@ export const ROLE_SCREENS: Record<Role, Screen[]> = {
   owner: [
     'myday','planner','calendar','contentplan','dmboard',
     'clients','client-detail','reports',
-    'pipeline','leads',
+    'pipeline','leads','journey',
     'team','onboarding','assistant','performance','permissions','connections','automations','knowledge','attendance',
   ],
   manager: [
     'myday','planner','calendar','contentplan','dmboard',
     'clients','client-detail','reports',
-    'pipeline','leads',
+    'pipeline','leads','journey',
     'team','onboarding','assistant','performance','knowledge','attendance',
   ],
   sales: [
