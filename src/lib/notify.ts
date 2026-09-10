@@ -26,6 +26,7 @@ export interface NotifyChannels {
 // Pick a distinct leading emoji per notification kind (used in Telegram).
 function notifEmoji(n: NotifyInput): string {
   const s = `${n.title || ''} ${n.text || ''}`.toLowerCase()
+  if (/invoice|payment|paid|due soon/.test(s)) return '💰'
   if (/proposal/.test(s)) return /accepted|signed|won/.test(s) ? '🎉' : '📄'
   if (/account assigned|put you on/.test(s)) return '🤝'
   if (/onboard/.test(s)) return /complete|live|welcome/.test(s) ? '🎉' : '🚀'

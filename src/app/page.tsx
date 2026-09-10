@@ -17,6 +17,7 @@ import ReportsScreen from '@/components/accounts/ReportsScreen'
 import PipelineScreen from '@/components/sales/PipelineScreen'
 import LeadsScreen from '@/components/sales/LeadsScreen'
 import ClientJourney from '@/components/sales/ClientJourney'
+import InvoicesScreen from '@/components/sales/InvoicesScreen'
 import TeamScreen from '@/components/org/TeamScreen'
 import PerformanceScreen from '@/components/org/PerformanceScreen'
 import PermissionsScreen from '@/components/org/PermissionsScreen'
@@ -68,6 +69,7 @@ const SCREEN_PATHS: Record<string, Screen> = {
   '/pipeline': 'pipeline',
   '/leads': 'leads',
   '/journey': 'journey',
+  '/invoices': 'invoices',
   '/team': 'team',
   '/performance': 'performance',
   '/permissions': 'permissions',
@@ -90,6 +92,7 @@ const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
   pipeline: '/pipeline',
   leads: '/leads',
   journey: '/journey',
+  invoices: '/invoices',
   team: '/team',
   performance: '/performance',
   permissions: '/permissions',
@@ -210,6 +213,7 @@ function AppShell() {
       case 'pipeline':    return <PipelineScreen />
       case 'leads':       return <LeadsScreen />
       case 'journey':     return <ClientJourney />
+      case 'invoices':    return <InvoicesScreen />
       case 'team':        return <TeamScreen />
       case 'performance': return <PerformanceScreen />
       case 'permissions': return <PermissionsScreen />

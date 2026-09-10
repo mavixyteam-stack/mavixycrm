@@ -5,7 +5,7 @@ export type NavGroup = 'work' | 'accounts' | 'sales' | 'org'
 export type Screen =
   | 'myday' | 'planner' | 'calendar' | 'contentplan' | 'dmboard'
   | 'clients' | 'client-detail' | 'reports' | 'onboarding'
-  | 'pipeline' | 'leads' | 'journey'
+  | 'pipeline' | 'leads' | 'journey' | 'invoices'
   | 'team' | 'permissions' | 'performance' | 'connections' | 'automations' | 'knowledge' | 'assistant'
   | 'attendance'
 
@@ -193,6 +193,36 @@ export interface Proposal {
   sent_at?: string | null
   viewed_at?: string | null
   accepted_at?: string | null
+  created_at: string
+  updated_at?: string | null
+}
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid'
+
+export interface Invoice {
+  id: string
+  number: string
+  journey_id?: string | null
+  client_id?: string | null
+  company?: string | null
+  client_name?: string | null
+  contact_email?: string | null
+  line_items: ProposalLineItem[]
+  currency?: string | null
+  tax_percent?: number | null
+  discount?: number | null
+  total: number
+  amount_paid?: number | null
+  notes?: string | null
+  issue_date?: string | null
+  due_date?: string | null
+  status: InvoiceStatus
+  token: string
+  created_by?: string | null
+  sent_at?: string | null
+  paid_at?: string | null
+  last_reminder_at?: string | null
   created_at: string
   updated_at?: string | null
 }

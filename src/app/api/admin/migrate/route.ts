@@ -203,7 +203,39 @@ CREATE INDEX IF NOT EXISTS proposals_journey_idx ON proposals (journey_id);
 -- direct table access.
 ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "mavixy_proposals" ON proposals;
-CREATE POLICY "mavixy_proposals" ON proposals FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+CREATE POLICY "mavixy_proposals" ON proposals FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Invoices: billing + payment tracking, with a public view link and reminders
+CREATE TABLE IF NOT EXISTS invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  number TEXT,
+  journey_id UUID,
+  client_id UUID,
+  company TEXT,
+  client_name TEXT,
+  contact_email TEXT,
+  line_items JSONB DEFAULT '[]'::jsonb,
+  currency TEXT DEFAULT 'INR',
+  tax_percent NUMERIC DEFAULT 0,
+  discount NUMERIC DEFAULT 0,
+  total NUMERIC DEFAULT 0,
+  amount_paid NUMERIC DEFAULT 0,
+  notes TEXT,
+  issue_date DATE,
+  due_date DATE,
+  status TEXT NOT NULL DEFAULT 'draft',
+  token TEXT UNIQUE NOT NULL,
+  created_by UUID,
+  sent_at TIMESTAMPTZ,
+  paid_at TIMESTAMPTZ,
+  last_reminder_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS invoices_status_idx ON invoices (status, due_date);
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mavixy_invoices" ON invoices;
+CREATE POLICY "mavixy_invoices" ON invoices FOR ALL TO authenticated USING (true) WITH CHECK (true);`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

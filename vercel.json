@@ -10,6 +10,7 @@
     { "path": "/api/automations/daily-report", "schedule": "0 15 * * *" },
     { "path": "/api/automations/morning-brief", "schedule": "0 3 * * 1-5" },
     { "path": "/api/automations/lead-followup", "schedule": "30 3 * * *" },
-    { "path": "/api/automations/weekly-digest", "schedule": "30 2 * * 1" }
+    { "path": "/api/automations/weekly-digest", "schedule": "30 2 * * 1" },
+    { "path": "/api/automations/payment-reminders", "schedule": "0 4 * * *" }
   ]
 }

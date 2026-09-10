@@ -1,5 +1,5 @@
 import { createClient } from './supabase/client'
-import type { PlanItem, Task, Deal, Client, AttendanceRequest, Journey, Proposal } from '@/types'
+import type { PlanItem, Task, Deal, Client, AttendanceRequest, Journey, Proposal, Invoice } from '@/types'
 
 // ─── Server-side write helper (bypasses RLS via service role key) ─────────────
 
@@ -40,6 +40,7 @@ export async function loadWorkspace() {
     { data: attReqs },
     { data: journeys },
     { data: proposals },
+    { data: invoices },
   ] = await Promise.all([
     sb.from('clients').select('*').order('created_at'),
     sb.from('plan_items').select('*').order('created_at'),
@@ -47,9 +48,10 @@ export async function loadWorkspace() {
     sb.from('deals').select('*').order('created_at'),
     sb.from('profiles').select('*').order('created_at'),
     sb.from('attendance_requests').select('*').order('created_at', { ascending: false }),
-    // journeys / proposals may not exist until the migration runs — tolerate it
+    // journeys / proposals / invoices may not exist until the migration runs
     sb.from('journeys').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
     sb.from('proposals').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
+    sb.from('invoices').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
   ])
   return {
     clients: clients || [],
@@ -60,6 +62,7 @@ export async function loadWorkspace() {
     attendanceRequests: attReqs || [],
     journeys: journeys || [],
     proposals: proposals || [],
+    invoices: invoices || [],
   }
 }
 
@@ -120,6 +123,40 @@ export async function dbUpsertProposal(p: Proposal) {
 
 export async function dbDeleteProposal(id: string) {
   await apiDelete('proposals', id)
+}
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+
+export async function dbUpsertInvoice(inv: Invoice) {
+  await apiUpsert('invoices', {
+    id: inv.id,
+    number: inv.number,
+    journey_id: inv.journey_id || null,
+    client_id: inv.client_id || null,
+    company: inv.company || null,
+    client_name: inv.client_name || null,
+    contact_email: inv.contact_email || null,
+    line_items: inv.line_items || [],
+    currency: inv.currency || 'INR',
+    tax_percent: inv.tax_percent ?? 0,
+    discount: inv.discount ?? 0,
+    total: inv.total || 0,
+    amount_paid: inv.amount_paid ?? 0,
+    notes: inv.notes || null,
+    issue_date: inv.issue_date || null,
+    due_date: inv.due_date || null,
+    status: inv.status,
+    token: inv.token,
+    created_by: inv.created_by || null,
+    sent_at: inv.sent_at || null,
+    paid_at: inv.paid_at || null,
+    last_reminder_at: inv.last_reminder_at || null,
+    updated_at: new Date().toISOString(),
+  })
+}
+
+export async function dbDeleteInvoice(id: string) {
+  await apiDelete('invoices', id)
 }
 
 // ─── Plan items ───────────────────────────────────────────────────────────────

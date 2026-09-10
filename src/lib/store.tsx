@@ -1,6 +1,6 @@
 'use client'
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client, Notification, Journey, Proposal } from '@/types'
+import type { Screen, Profile, PlanItem, Task, AttendanceRecord, AttendanceRequest, Deal, Client, Notification, Journey, Proposal, Invoice } from '@/types'
 import { createClient } from './supabase/client'
 import {
   loadWorkspace,
@@ -10,6 +10,7 @@ import {
   dbUpsertAttendanceRequest, dbUpdateAttendanceRequest,
   dbUpsertJourney, dbDeleteJourney,
   dbUpsertProposal, dbDeleteProposal,
+  dbUpsertInvoice, dbDeleteInvoice,
   loadNotifications, markNotificationRead, markAllNotificationsRead, notifyUsers,
 } from './db'
 
@@ -27,6 +28,7 @@ interface AppState {
   deals: Deal[]
   journeys: Journey[]
   proposals: Proposal[]
+  invoices: Invoice[]
   notifications: Notification[]
   selectedClientId: string | null
   toast: string | null
@@ -48,7 +50,7 @@ type Action =
   | { type: 'SET_USER'; user: Profile }
   | { type: 'LOGOUT' }
   | { type: 'AUTH_LOADED' }
-  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendanceRequests: AttendanceRequest[]; journeys: Journey[]; proposals: Proposal[] }
+  | { type: 'SET_WORKSPACE'; clients: Client[]; planItems: PlanItem[]; tasks: Task[]; deals: Deal[]; users: Profile[]; attendanceRequests: AttendanceRequest[]; journeys: Journey[]; proposals: Proposal[]; invoices: Invoice[] }
   | { type: 'SET_PLAN_ITEMS'; items: PlanItem[] }
   | { type: 'UPSERT_PLAN_ITEM'; item: PlanItem }
   | { type: 'DELETE_PLAN_ITEM'; id: string }
@@ -68,6 +70,9 @@ type Action =
   | { type: 'SET_PROPOSALS'; proposals: Proposal[] }
   | { type: 'UPSERT_PROPOSAL'; proposal: Proposal }
   | { type: 'DELETE_PROPOSAL'; id: string }
+  | { type: 'SET_INVOICES'; invoices: Invoice[] }
+  | { type: 'UPSERT_INVOICE'; invoice: Invoice }
+  | { type: 'DELETE_INVOICE'; id: string }
   | { type: 'DELETE_DEAL'; id: string }
   | { type: 'SET_ATTENDANCE'; attendance: AttendanceRecord[] }
   | { type: 'SET_NOTIFICATIONS'; notifications: Notification[] }
@@ -104,6 +109,7 @@ const initial: AppState = {
   deals: [],
   journeys: [],
   proposals: [],
+  invoices: [],
   notifications: [],
   selectedClientId: null,
   toast: null,
@@ -139,6 +145,7 @@ function reducer(state: AppState, action: Action): AppState {
       deals: action.deals,
       journeys: action.journeys,
       proposals: action.proposals,
+      invoices: action.invoices,
       users: action.users,
       attendanceRequests: action.attendanceRequests,
     }
@@ -168,6 +175,9 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_PROPOSALS': return { ...state, proposals: action.proposals }
     case 'UPSERT_PROPOSAL': return { ...state, proposals: upsert(state.proposals, action.proposal) }
     case 'DELETE_PROPOSAL': return { ...state, proposals: state.proposals.filter(x => x.id !== action.id) }
+    case 'SET_INVOICES': return { ...state, invoices: action.invoices }
+    case 'UPSERT_INVOICE': return { ...state, invoices: upsert(state.invoices, action.invoice) }
+    case 'DELETE_INVOICE': return { ...state, invoices: state.invoices.filter(x => x.id !== action.id) }
     case 'SET_ATTENDANCE': return { ...state, attendance: action.attendance }
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.notifications }
     case 'ADD_NOTIFICATION':
@@ -286,6 +296,7 @@ async function fetchWorkspace(dispatch: React.Dispatch<Action>) {
       deals: data.deals,
       journeys: data.journeys,
       proposals: data.proposals,
+      invoices: data.invoices,
       users: data.profiles,
       attendanceRequests: data.attendanceRequests,
     })
@@ -489,6 +500,24 @@ export function useDeleteProposal() {
   return useCallback(async (id: string) => {
     dispatch({ type: 'DELETE_PROPOSAL', id })
     try { await dbDeleteProposal(id) } catch (e) { errToast('deleteProposal', e) }
+  }, [dispatch, errToast])
+}
+
+export function useUpsertInvoice() {
+  const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
+  return useCallback(async (invoice: Invoice) => {
+    dispatch({ type: 'UPSERT_INVOICE', invoice })
+    try { await dbUpsertInvoice(invoice) } catch (e) { errToast('upsertInvoice', e) }
+  }, [dispatch, errToast])
+}
+
+export function useDeleteInvoice() {
+  const { dispatch } = useApp()
+  const errToast = useDbErrorToast()
+  return useCallback(async (id: string) => {
+    dispatch({ type: 'DELETE_INVOICE', id })
+    try { await dbDeleteInvoice(id) } catch (e) { errToast('deleteInvoice', e) }
   }, [dispatch, errToast])
 }
 
