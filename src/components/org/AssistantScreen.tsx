@@ -98,6 +98,20 @@ export default function AssistantScreen() {
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }) }, [msgs, loading, interim])
 
+  // Remember the conversation across reloads (per user, this device).
+  const chatKey = `mavixy_jarvis_${state.currentUser?.id || 'me'}`
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+    try { const saved = localStorage.getItem(chatKey); if (saved) { const arr = JSON.parse(saved); if (Array.isArray(arr) && arr.length) setMsgs(arr) } } catch { /* ignore */ }
+  }, [chatKey])
+  useEffect(() => {
+    if (!restoredRef.current) return
+    try { localStorage.setItem(chatKey, JSON.stringify(msgs.slice(-50))) } catch { /* ignore */ }
+  }, [msgs, chatKey])
+  function clearChat() { setMsgs([]); try { localStorage.removeItem(chatKey) } catch { /* ignore */ } }
+
   // Keep refs in sync with the latest state/closures for use inside callbacks.
   useEffect(() => { listeningRef.current = listening }, [listening])
   useEffect(() => { voiceOnRef.current = voiceOn }, [voiceOn])
@@ -314,6 +328,13 @@ export default function AssistantScreen() {
             {listening ? 'Listening…' : speaking ? 'Speaking…' : 'Your AI chief of staff — talk or type, and I can assign work too'}
           </div>
         </div>
+
+        {msgs.length > 0 && (
+          <button onClick={clearChat} title="Clear conversation"
+            style={{ height: 38, padding: '0 12px', borderRadius: 11, border: '1.5px solid var(--c-border)', background: '#fff', color: 'var(--c-muted)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+            New chat
+          </button>
+        )}
 
         {/* Voice controls */}
         {voiceSupported && (

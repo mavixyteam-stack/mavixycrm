@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useApp, useToast, useUpsertProposal } from '@/lib/store'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { X } from '@/components/ui/Icon'
-import { makeProposalToken, deckTotal } from '@/lib/proposal'
+import { makeProposalToken } from '@/lib/proposal'
 import ProposalDeckView from './ProposalDeckView'
 import type { Journey, Proposal, ProposalDeck, ChatTurn } from '@/types'
 
@@ -29,8 +29,31 @@ export default function ProposalStudio({ journey, existing, onClose }: {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState(false)
-  const [approved, setApproved] = useState(existing?.kind === 'deck' && !!existing?.deck)
   const [listening, setListening] = useState(false)
+
+  // Persist the whole session (chat + draft) after every turn, so closing the
+  // tab never loses work — reopen it from the deal's Proposals list.
+  async function persist(chat: ChatTurn[], dk: ProposalDeck | null) {
+    const proposal: Proposal = {
+      id: idRef.current,
+      journey_id: journey.id,
+      token: tokenRef.current,
+      title: dk?.promiseHeadline || `Proposal for ${journey.company || journey.name}`,
+      company: journey.company || deck?.clientName || null,
+      client_name: journey.name || null,
+      line_items: [],
+      currency: 'INR',
+      total: 0,
+      status: existing?.status && existing.status !== 'draft' ? existing.status : 'draft',
+      kind: 'deck',
+      deck: dk,
+      chat,
+      created_by: me,
+      created_at: existing?.created_at || new Date().toISOString(),
+    }
+    try { await upsert(proposal) } catch { /* ignore */ }
+    try { localStorage.setItem(`mvx_studio_${idRef.current}`, JSON.stringify({ chat, deck: dk })) } catch { /* ignore */ }
+  }
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const recogRef = useRef<SR | null>(null)
@@ -42,51 +65,32 @@ export default function ProposalStudio({ journey, existing, onClose }: {
     if (!text || loading) return
     const next = [...msgs, { role: 'user' as const, text }]
     setMsgs(next); setInput(''); setLoading(true)
+    let reply = 'I could not reach the server. Try again.'
+    let newDeck = deck
     try {
       const res = await fetch('/api/proposals/studio', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ journeyId: journey.id, messages: next, deck }),
       })
       const d = await res.json()
-      if (!res.ok) { setMsgs(m => [...m, { role: 'assistant', text: d.error || 'Something went wrong.' }]); return }
-      setMsgs(m => [...m, { role: 'assistant', text: d.message }])
-      if (d.mode === 'draft' && d.deck) { setDeck(d.deck); setApproved(false) }
-    } catch {
-      setMsgs(m => [...m, { role: 'assistant', text: 'I could not reach the server. Try again.' }])
-    } finally { setLoading(false) }
-  }
-
-  async function approve() {
-    if (!deck) return
-    const proposal: Proposal = {
-      id: idRef.current,
-      journey_id: journey.id,
-      token: tokenRef.current,
-      title: deck.promiseHeadline || `Proposal for ${deck.clientName || journey.company}`,
-      company: journey.company || deck.clientName || null,
-      client_name: journey.name || null,
-      line_items: [],
-      currency: 'INR',
-      total: deckTotal(deck),
-      status: existing?.status && existing.status !== 'draft' ? existing.status : 'draft',
-      kind: 'deck',
-      deck,
-      chat: msgs,
-      created_by: me,
-      created_at: existing?.created_at || new Date().toISOString(),
-    }
-    await upsert(proposal)
-    setApproved(true)
-    toast('Proposal saved ✓')
+      reply = d.message || d.error || 'Something went wrong.'
+      if (d.deck) newDeck = d.deck
+    } catch { /* keep fallback reply */ }
+    const finalMsgs = [...next, { role: 'assistant' as const, text: reply }]
+    setMsgs(finalMsgs)
+    if (newDeck !== deck) setDeck(newDeck)
+    setLoading(false)
+    persist(finalMsgs, newDeck)   // autosave the turn
   }
 
   function copyLink() {
+    persist(msgs, deck)
     try { navigator.clipboard.writeText(`${window.location.origin}/proposal/${tokenRef.current}`); toast('Share link copied ✓') } catch { toast('Copy failed') }
   }
   async function sendEmail() {
     const email = window.prompt('Send the proposal to which email?', journey.contact_email || '')
     if (!email) return
-    if (!approved) await approve()
+    await persist(msgs, deck)
     const res = await fetch('/api/proposals/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: tokenRef.current, email }) })
     toast(res.ok ? `Sent to ${email} ✓` : 'Could not send')
   }
@@ -155,13 +159,11 @@ export default function ProposalStudio({ journey, existing, onClose }: {
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: '#14110E' }}>Draft ready — {deck.clientName}</div>
                     <div style={{ fontSize: 12.5, color: '#6B6153', marginTop: 3 }}>{deck.months?.length || 0} phase(s){deck.months?.[0]?.investmentTotal ? ` · from ${deck.months[0].investmentTotal}` : ''} · preview the full deck</div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                      <button onClick={() => setPreview(true)} style={{ fontSize: 13, fontWeight: 700, color: '#14110E', background: '#fff', border: '1.5px solid #D6C7B0', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Preview deck</button>
-                      {!approved
-                        ? <button onClick={approve} style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#FF5A00', border: 'none', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Approve &amp; save</button>
-                        : <><button onClick={copyLink} style={{ fontSize: 13, fontWeight: 700, color: '#14110E', background: '#fff', border: '1.5px solid #D6C7B0', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Copy link</button>
-                          <button onClick={sendEmail} style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#100E0C', border: 'none', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Send by email</button></>}
+                      <button onClick={() => setPreview(true)} style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#FF5A00', border: 'none', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Preview deck</button>
+                      <button onClick={copyLink} style={{ fontSize: 13, fontWeight: 700, color: '#14110E', background: '#fff', border: '1.5px solid #D6C7B0', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Copy link</button>
+                      <button onClick={sendEmail} style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#100E0C', border: 'none', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Send by email</button>
                     </div>
-                    {approved && <div style={{ fontSize: 12, color: '#12643A', fontWeight: 600, marginTop: 9 }}>Saved. Keep chatting to make changes, then Approve again.</div>}
+                    <div style={{ fontSize: 12, color: '#12643A', fontWeight: 600, marginTop: 9 }}>Saved automatically. Keep chatting to change anything — &ldquo;make Phase 2 ₹50k&rdquo;, &ldquo;add a website section&rdquo;.</div>
                   </div>
                 )}
               </div>
