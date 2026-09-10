@@ -235,7 +235,32 @@ CREATE TABLE IF NOT EXISTS invoices (
 CREATE INDEX IF NOT EXISTS invoices_status_idx ON invoices (status, due_date);
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "mavixy_invoices" ON invoices;
-CREATE POLICY "mavixy_invoices" ON invoices FOR ALL TO authenticated USING (true) WITH CHECK (true);`
+CREATE POLICY "mavixy_invoices" ON invoices FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Contracts / agreements: the client reads and e-signs from a public link
+CREATE TABLE IF NOT EXISTS contracts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  journey_id UUID,
+  proposal_id UUID,
+  token TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  company TEXT,
+  client_name TEXT,
+  contact_email TEXT,
+  body TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  signer_name TEXT,
+  created_by UUID,
+  sent_at TIMESTAMPTZ,
+  viewed_at TIMESTAMPTZ,
+  signed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS contracts_journey_idx ON contracts (journey_id);
+ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mavixy_contracts" ON contracts;
+CREATE POLICY "mavixy_contracts" ON contracts FOR ALL TO authenticated USING (true) WITH CHECK (true);`
 
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

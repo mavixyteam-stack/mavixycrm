@@ -227,6 +227,29 @@ export interface Invoice {
   updated_at?: string | null
 }
 
+// ─── Contracts / agreements ───────────────────────────────────────────────────
+export type ContractStatus = 'draft' | 'sent' | 'viewed' | 'signed' | 'declined'
+
+export interface Contract {
+  id: string
+  journey_id?: string | null
+  proposal_id?: string | null
+  token: string
+  title: string
+  company?: string | null
+  client_name?: string | null
+  contact_email?: string | null
+  body: string
+  status: ContractStatus
+  signer_name?: string | null
+  created_by?: string | null
+  sent_at?: string | null
+  viewed_at?: string | null
+  signed_at?: string | null
+  created_at: string
+  updated_at?: string | null
+}
+
 export type NotificationType = 'warning' | 'info' | 'success' | 'reminder' | 'request'
 
 export interface Notification {

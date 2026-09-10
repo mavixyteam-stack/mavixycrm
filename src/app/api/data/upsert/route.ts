@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
-const ALLOWED_TABLES = ['deals', 'tasks', 'clients', 'plan_items', 'attendance', 'attendance_requests', 'profiles', 'work_logs', 'journeys', 'proposals', 'invoices']
+const ALLOWED_TABLES = ['deals', 'tasks', 'clients', 'plan_items', 'attendance', 'attendance_requests', 'profiles', 'work_logs', 'journeys', 'proposals', 'invoices', 'contracts']
 // Financial tables: writes require owner/manager, enforced server-side.
 const SENSITIVE_TABLES = ['invoices']
 

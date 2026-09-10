@@ -8,8 +8,10 @@ import {
   BILLING_OPTIONS, SERVICE_OPTIONS, SOURCE_OPTIONS,
 } from '@/lib/journey'
 import { PROPOSAL_STATUS, money } from '@/lib/proposal'
+import { CONTRACT_STATUS } from '@/lib/contract'
 import ProposalBuilder from './ProposalBuilder'
-import type { Journey, JourneyStage, Proposal } from '@/types'
+import ContractBuilder from './ContractBuilder'
+import type { Journey, JourneyStage, Proposal, Contract } from '@/types'
 
 const todayStr = () => {
   const d = new Date()
@@ -41,6 +43,7 @@ export default function ClientJourney() {
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [showLost, setShowLost] = useState(false)
   const [proposalCtx, setProposalCtx] = useState<{ journey: Journey; existing: Proposal | null } | null>(null)
+  const [contractCtx, setContractCtx] = useState<{ journey: Journey; existing: Contract | null } | null>(null)
 
   const me = state.currentUser?.id
   const owners = state.users.filter(u => ['owner', 'manager', 'sales'].includes(u.role))
@@ -270,6 +273,7 @@ export default function ClientJourney() {
           j={detail}
           ownerName={person(detail.owner_id)?.name}
           proposals={state.proposals.filter(p => p.journey_id === detail.id)}
+          contracts={state.contracts.filter(ct => ct.journey_id === detail.id)}
           onClose={() => setDetailId(null)}
           onEdit={() => openEdit(detail)}
           onMove={(s) => moveStage(detail, s)}
@@ -279,6 +283,9 @@ export default function ClientJourney() {
           onNewProposal={() => setProposalCtx({ journey: detail, existing: null })}
           onOpenProposal={(p) => setProposalCtx({ journey: detail, existing: p })}
           onCopyProposal={async (p) => { try { await navigator.clipboard.writeText(`${window.location.origin}/proposal/${p.token}`); toast('Share link copied ✓') } catch { toast('Copy failed') } }}
+          onNewContract={() => setContractCtx({ journey: detail, existing: null })}
+          onOpenContract={(ct) => setContractCtx({ journey: detail, existing: ct })}
+          onCopyContract={async (ct) => { try { await navigator.clipboard.writeText(`${window.location.origin}/contract/${ct.token}`); toast('Signing link copied ✓') } catch { toast('Copy failed') } }}
           onAction={(label) => toast(`${label} — coming in the next build 🚧`)}
         />
       )}
@@ -286,6 +293,11 @@ export default function ClientJourney() {
       {/* Proposal builder */}
       {proposalCtx && (
         <ProposalBuilder journey={proposalCtx.journey} existing={proposalCtx.existing} onClose={() => setProposalCtx(null)} />
+      )}
+
+      {/* Contract builder */}
+      {contractCtx && (
+        <ContractBuilder journey={contractCtx.journey} existing={contractCtx.existing} onClose={() => setContractCtx(null)} />
       )}
 
       {/* Create / edit modal */}
@@ -304,11 +316,12 @@ export default function ClientJourney() {
 }
 
 // ─── Detail drawer ──────────────────────────────────────────────────────────
-function JourneyDetail({ j, ownerName, proposals, onClose, onEdit, onMove, onLost, onReopen, onDelete, onNewProposal, onOpenProposal, onCopyProposal, onAction }: {
-  j: Journey; ownerName?: string; proposals: Proposal[]
+function JourneyDetail({ j, ownerName, proposals, contracts, onClose, onEdit, onMove, onLost, onReopen, onDelete, onNewProposal, onOpenProposal, onCopyProposal, onNewContract, onOpenContract, onCopyContract, onAction }: {
+  j: Journey; ownerName?: string; proposals: Proposal[]; contracts: Contract[]
   onClose: () => void; onEdit: () => void; onMove: (s: JourneyStage) => void
   onLost: () => void; onReopen: () => void; onDelete: () => void
   onNewProposal: () => void; onOpenProposal: (p: Proposal) => void; onCopyProposal: (p: Proposal) => void
+  onNewContract: () => void; onOpenContract: (c: Contract) => void; onCopyContract: (c: Contract) => void
   onAction: (label: string) => void
 }) {
   const def = stageDef(j.stage)
@@ -350,7 +363,7 @@ function JourneyDetail({ j, ownerName, proposals, onClose, onEdit, onMove, onLos
               <div style={{ fontSize: 10.5, fontWeight: 700, color: def.c, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Next move</div>
               <div style={{ fontSize: 13.5, color: 'var(--c-ink-2)', lineHeight: 1.5 }}>{def.hint}</div>
               {def.action && (
-                <button onClick={() => def.key === 'proposal' ? onNewProposal() : onAction(def.action!)}
+                <button onClick={() => def.key === 'proposal' ? onNewProposal() : def.key === 'contract' ? onNewContract() : onAction(def.action!)}
                   style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: def.c, color: '#fff', borderRadius: 9, padding: '7px 13px', fontWeight: 700, fontSize: 12.5, border: 'none', cursor: 'pointer' }}>
                   {def.action}
                 </button>
@@ -380,6 +393,36 @@ function JourneyDetail({ j, ownerName, proposals, onClose, onEdit, onMove, onLos
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>
                           </button>
                           <button onClick={() => onOpenProposal(p)} title="Edit" style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-ink-3)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+            </div>
+
+            {/* Contracts */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--c-ghost)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Agreements</div>
+                <button onClick={onNewContract} style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>+ New agreement</button>
+              </div>
+              {contracts.length === 0
+                ? <div style={{ fontSize: 13, color: 'var(--c-faint)' }}>No agreements yet. Draft one for the client to e-sign.</div>
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    {contracts.map(c => {
+                      const st = CONTRACT_STATUS[c.status]
+                      return (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--c-border-soft)', borderRadius: 10, padding: '9px 12px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--c-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</div>
+                            {c.signer_name && <div style={{ fontSize: 12, color: 'var(--c-faint)', marginTop: 2 }}>Signed by {c.signer_name}</div>}
+                          </div>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: st.c, background: st.bg, borderRadius: 6, padding: '3px 9px', flexShrink: 0 }}>{st.label}</span>
+                          <button onClick={() => onCopyContract(c)} title="Copy signing link" style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--c-fill)', border: 'none', cursor: 'pointer', color: 'var(--c-muted)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>
+                          </button>
+                          <button onClick={() => onOpenContract(c)} title="Open" style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-ink-3)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>Open</button>
                         </div>
                       )
                     })}

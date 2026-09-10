@@ -1,5 +1,5 @@
 import { createClient } from './supabase/client'
-import type { PlanItem, Task, Deal, Client, AttendanceRequest, Journey, Proposal, Invoice } from '@/types'
+import type { PlanItem, Task, Deal, Client, AttendanceRequest, Journey, Proposal, Invoice, Contract } from '@/types'
 
 // ─── Server-side write helper (bypasses RLS via service role key) ─────────────
 
@@ -41,6 +41,7 @@ export async function loadWorkspace() {
     { data: journeys },
     { data: proposals },
     { data: invoices },
+    { data: contracts },
   ] = await Promise.all([
     sb.from('clients').select('*').order('created_at'),
     sb.from('plan_items').select('*').order('created_at'),
@@ -48,10 +49,11 @@ export async function loadWorkspace() {
     sb.from('deals').select('*').order('created_at'),
     sb.from('profiles').select('*').order('created_at'),
     sb.from('attendance_requests').select('*').order('created_at', { ascending: false }),
-    // journeys / proposals / invoices may not exist until the migration runs
+    // journeys / proposals / invoices / contracts may not exist until migration
     sb.from('journeys').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
     sb.from('proposals').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
     sb.from('invoices').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
+    sb.from('contracts').select('*').order('created_at', { ascending: false }).then(r => r, () => ({ data: [] })),
   ])
   return {
     clients: clients || [],
@@ -63,6 +65,7 @@ export async function loadWorkspace() {
     journeys: journeys || [],
     proposals: proposals || [],
     invoices: invoices || [],
+    contracts: contracts || [],
   }
 }
 
@@ -157,6 +160,32 @@ export async function dbUpsertInvoice(inv: Invoice) {
 
 export async function dbDeleteInvoice(id: string) {
   await apiDelete('invoices', id)
+}
+
+// ─── Contracts ────────────────────────────────────────────────────────────────
+
+export async function dbUpsertContract(c: Contract) {
+  await apiUpsert('contracts', {
+    id: c.id,
+    journey_id: c.journey_id || null,
+    proposal_id: c.proposal_id || null,
+    token: c.token,
+    title: c.title,
+    company: c.company || null,
+    client_name: c.client_name || null,
+    contact_email: c.contact_email || null,
+    body: c.body,
+    status: c.status,
+    signer_name: c.signer_name || null,
+    created_by: c.created_by || null,
+    sent_at: c.sent_at || null,
+    signed_at: c.signed_at || null,
+    updated_at: new Date().toISOString(),
+  })
+}
+
+export async function dbDeleteContract(id: string) {
+  await apiDelete('contracts', id)
 }
 
 // ─── Plan items ───────────────────────────────────────────────────────────────

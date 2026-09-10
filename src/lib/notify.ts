@@ -27,6 +27,7 @@ export interface NotifyChannels {
 function notifEmoji(n: NotifyInput): string {
   const s = `${n.title || ''} ${n.text || ''}`.toLowerCase()
   if (/invoice|payment|paid|due soon/.test(s)) return '💰'
+  if (/agreement|contract/.test(s)) return /signed/.test(s) ? '🖊️' : '📑'
   if (/proposal/.test(s)) return /accepted|signed|won/.test(s) ? '🎉' : '📄'
   if (/account assigned|put you on/.test(s)) return '🤝'
   if (/onboard/.test(s)) return /complete|live|welcome/.test(s) ? '🎉' : '🚀'
