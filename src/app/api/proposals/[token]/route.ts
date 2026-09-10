@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
 
   const { data, error } = await admin
     .from('proposals')
-    .select('token, title, company, client_name, intro, line_items, currency, tax_percent, discount, total, terms, valid_until, status, accepted_at, created_at')
+    .select('token, title, company, client_name, intro, line_items, currency, tax_percent, discount, total, terms, valid_until, status, kind, deck, accepted_at, created_at')
     .eq('token', token)
     .maybeSingle()
 

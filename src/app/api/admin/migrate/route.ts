@@ -208,6 +208,10 @@ CREATE INDEX IF NOT EXISTS proposals_journey_idx ON proposals (journey_id);
 ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "mavixy_proposals" ON proposals;
 CREATE POLICY "mavixy_proposals" ON proposals FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- Proposal Studio: the branded deck content + the chat that produced it
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS kind TEXT;
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS deck JSONB;
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS chat JSONB;
 
 -- Invoices: billing + payment tracking, with a public view link and reminders
 CREATE TABLE IF NOT EXISTS invoices (

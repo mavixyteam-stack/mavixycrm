@@ -177,6 +177,32 @@ export interface ProposalLineItem {
 
 export type ProposalStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejected'
 
+// ─── Structured proposal deck (the branded, AI-generated presentation) ─────────
+export interface DeckAsset { label: string }
+export interface DeckCapability { title: string; items: string[] }
+export interface DeckMonth { key: string; focus: string; objective?: string }
+export interface DeckCell { intensity: number; price: number }   // intensity 0–4 (Off→Max)
+export interface DeckService { name: string; cells: DeckCell[] } // cells align 1:1 with months
+export interface DeckExtra { heading: string; body?: string; bullets?: string[] }
+
+export interface ProposalDeck {
+  clientName: string
+  clientTagline?: string
+  promiseHeadline?: string        // e.g. "3-Month Digital Growth Plan"
+  promiseText?: string
+  opportunityHeadline?: string    // e.g. "You already have the hard part."
+  opportunityBody?: string
+  assets?: DeckAsset[]            // what the client already has
+  capabilities?: DeckCapability[] // defaults to Mavixy's five if omitted
+  months: DeckMonth[]             // the phases/columns
+  services: DeckService[]         // the rows of the intensity matrix
+  gstNote?: string
+  extras?: DeckExtra[]            // approach / measurement / terms / etc.
+  closingHeadline?: string
+}
+
+export interface ChatTurn { role: 'user' | 'assistant'; text: string }
+
 export interface Proposal {
   id: string
   journey_id?: string | null
@@ -193,6 +219,9 @@ export interface Proposal {
   terms?: string | null
   valid_until?: string | null
   status: ProposalStatus
+  kind?: 'simple' | 'deck' | null   // 'deck' = branded AI presentation
+  deck?: ProposalDeck | null
+  chat?: ChatTurn[] | null          // the Proposal Studio conversation
   created_by?: string | null
   sent_at?: string | null
   viewed_at?: string | null

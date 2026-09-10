@@ -48,3 +48,38 @@ export function proposalIsExpired(p: Proposal): boolean {
   const today = new Date().toISOString().slice(0, 10)
   return p.valid_until < today && p.status !== 'accepted'
 }
+
+// ─── Proposal deck (branded presentation) ─────────────────────────────────────
+import type { ProposalDeck, DeckCapability } from '@/types'
+
+// Intensity 0–4 → label + heat class (matches the deck renderer palette).
+export const INTENSITY = [
+  { label: 'Off', h: 'h0' },
+  { label: 'Light', h: 'h1' },
+  { label: 'Medium', h: 'h2' },
+  { label: 'Heavy', h: 'h3' },
+  { label: 'Max', h: 'h4' },
+] as const
+
+export function intensityMeta(n: number) {
+  return INTENSITY[Math.max(0, Math.min(4, Math.round(n || 0)))]
+}
+
+/** Total ₹ for a given month index across all services. */
+export function monthTotal(deck: ProposalDeck, monthIndex: number): number {
+  return (deck.services || []).reduce((s, svc) => s + (svc.cells?.[monthIndex]?.price || 0), 0)
+}
+
+/** Grand total ₹ across every month. */
+export function deckTotal(deck: ProposalDeck): number {
+  return (deck.months || []).reduce((s, _m, i) => s + monthTotal(deck, i), 0)
+}
+
+// Mavixy's standard capability set — used when the AI omits it.
+export const DEFAULT_CAPABILITIES: DeckCapability[] = [
+  { title: 'Brand & Creative', items: ['Positioning', 'Visual identity', 'Creative direction'] },
+  { title: 'Digital & Tech', items: ['Website & UX', 'SEO build', 'Analytics'] },
+  { title: 'Content', items: ['Strategy', 'Photo & video', 'Short-form'] },
+  { title: 'Growth', items: ['Meta & Google', 'Lead generation', 'Performance'] },
+  { title: 'AI & Data', items: ['Reporting', 'Optimisation', 'Automation'] },
+]

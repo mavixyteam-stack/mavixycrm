@@ -10,6 +10,7 @@ import {
 import { PROPOSAL_STATUS, money } from '@/lib/proposal'
 import { CONTRACT_STATUS } from '@/lib/contract'
 import ProposalBuilder from './ProposalBuilder'
+import ProposalStudio from './ProposalStudio'
 import ContractBuilder from './ContractBuilder'
 import type { Journey, JourneyStage, Proposal, Contract } from '@/types'
 
@@ -55,6 +56,7 @@ export default function ClientJourney() {
   const [view, setView] = useState<'board' | 'leads'>('board')
   const [importing, setImporting] = useState(false)
   const [proposalCtx, setProposalCtx] = useState<{ journey: Journey; existing: Proposal | null } | null>(null)
+  const [studioCtx, setStudioCtx] = useState<{ journey: Journey; existing: Proposal | null } | null>(null)
   const [contractCtx, setContractCtx] = useState<{ journey: Journey; existing: Contract | null } | null>(null)
 
   const me = state.currentUser?.id
@@ -351,8 +353,8 @@ export default function ClientJourney() {
           onLost={() => markLost(detail)}
           onReopen={() => reopen(detail)}
           onDelete={() => del(detail)}
-          onNewProposal={() => setProposalCtx({ journey: detail, existing: null })}
-          onOpenProposal={(p) => setProposalCtx({ journey: detail, existing: p })}
+          onNewProposal={() => setStudioCtx({ journey: detail, existing: null })}
+          onOpenProposal={(p) => p.kind === 'deck' ? setStudioCtx({ journey: detail, existing: p }) : setProposalCtx({ journey: detail, existing: p })}
           onCopyProposal={async (p) => { try { await navigator.clipboard.writeText(`${window.location.origin}/proposal/${p.token}`); toast('Share link copied ✓') } catch { toast('Copy failed') } }}
           onNewContract={() => setContractCtx({ journey: detail, existing: null })}
           onOpenContract={(ct) => setContractCtx({ journey: detail, existing: ct })}
@@ -361,7 +363,12 @@ export default function ClientJourney() {
         />
       )}
 
-      {/* Proposal builder */}
+      {/* Proposal Studio (AI-drafted branded deck) */}
+      {studioCtx && (
+        <ProposalStudio journey={studioCtx.journey} existing={studioCtx.existing} onClose={() => setStudioCtx(null)} />
+      )}
+
+      {/* Proposal builder (legacy line-item proposals) */}
       {proposalCtx && (
         <ProposalBuilder journey={proposalCtx.journey} existing={proposalCtx.existing} onClose={() => setProposalCtx(null)} />
       )}

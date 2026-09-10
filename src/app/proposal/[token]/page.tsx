@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { computeTotals, money, proposalIsExpired } from '@/lib/proposal'
+import ProposalDeckView from '@/components/sales/ProposalDeckView'
 import type { Proposal } from '@/types'
 
 type State = 'loading' | 'notfound' | 'ok'
@@ -35,6 +36,38 @@ export default function ProposalPage() {
 
   if (state === 'loading') return <Center>Loading…</Center>
   if (state === 'notfound' || !p) return <Center>This proposal link is not valid or has been removed.</Center>
+
+  // Branded deck proposal — render the full Mavixy presentation + an accept bar.
+  if (p.kind === 'deck' && p.deck) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F5EDE1' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', maxWidth: 1040, margin: '0 auto', padding: '14px 22px 0' }}>
+          <button onClick={() => window.print()} style={{ background: '#fff', border: '1px solid #D6C7B0', borderRadius: 10, padding: '8px 14px', fontSize: 13, fontWeight: 700, color: '#6B6153', cursor: 'pointer', fontFamily: 'Instrument Sans,system-ui,sans-serif' }}>Print / Save PDF</button>
+        </div>
+        <ProposalDeckView deck={p.deck} />
+        <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 22px 44px' }}>
+          {accepted ? (
+            <div style={{ background: '#E7F6EC', border: '1px solid #Bfe3ca', borderRadius: 16, padding: '18px 20px', fontFamily: 'Instrument Sans,system-ui,sans-serif' }}>
+              <div style={{ fontWeight: 700, color: '#12643A', fontSize: 15 }}>Proposal accepted 🎉</div>
+              <div style={{ fontSize: 13.5, color: '#12643A', opacity: .85, marginTop: 3 }}>Thanks! We&apos;ve been notified and will be in touch with next steps.</div>
+            </div>
+          ) : (
+            <div style={{ background: '#100E0C', color: '#F5EDE1', borderRadius: 18, padding: '22px 24px', fontFamily: 'Instrument Sans,system-ui,sans-serif' }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Happy to go ahead? Add your name and accept.</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name"
+                  style={{ flex: 1, minWidth: 180, border: '1.5px solid #332E28', background: '#1A1712', color: '#F5EDE1', borderRadius: 11, padding: '12px 14px', fontSize: 14.5, outline: 'none', boxSizing: 'border-box' }} />
+                <button onClick={accept} disabled={accepting}
+                  style={{ background: '#FF5A00', color: '#fff', border: 'none', borderRadius: 11, padding: '12px 26px', fontWeight: 700, fontSize: 14.5, cursor: accepting ? 'default' : 'pointer', opacity: accepting ? .7 : 1 }}>
+                  {accepting ? 'Accepting…' : 'Accept proposal'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const items = Array.isArray(p.line_items) ? p.line_items : []
   const totals = computeTotals(items, p.tax_percent || 0, p.discount || 0)
