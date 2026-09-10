@@ -180,10 +180,23 @@ export type ProposalStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejecte
 // ─── Structured proposal deck (the branded, AI-generated presentation) ─────────
 export interface DeckAsset { label: string }
 export interface DeckCapability { title: string; items: string[] }
-export interface DeckMonth { key: string; focus: string; objective?: string }
+export interface DeckActivityGroup { heading: string; items: string[] }
+export interface DeckActivity { title: string; groups: DeckActivityGroup[] }
+export interface DeckOutcome { title: string; text: string }
+export interface DeckMonth {
+  key: string                     // "Month 1" / "Months 2-3"
+  focus: string                   // "Foundation"
+  objective?: string              // one-line objective
+  intro?: string                  // short phase intro
+  activities?: DeckActivity[]     // the "What we'll do" deep-dive
+  outcomes?: DeckOutcome[]        // the "Expected outcome" grid
+}
 export interface DeckCell { intensity: number; price: number }   // intensity 0–4 (Off→Max)
 export interface DeckService { name: string; cells: DeckCell[] } // cells align 1:1 with months
 export interface DeckExtra { heading: string; body?: string; bullets?: string[] }
+export interface DeckObjective { headline?: string; steps: string[] }        // the 01–06 phased overview
+export interface DeckJourneyRow { period: string; focus: string; objective: string }
+export interface DeckWeek { week: string; title: string; items: string[] }
 
 export interface ProposalDeck {
   clientName: string
@@ -193,12 +206,16 @@ export interface ProposalDeck {
   opportunityHeadline?: string    // e.g. "You already have the hard part."
   opportunityBody?: string
   assets?: DeckAsset[]            // what the client already has
-  capabilities?: DeckCapability[] // defaults to Mavixy's five if omitted
-  months: DeckMonth[]             // the phases/columns
+  objective?: DeckObjective       // the phased-approach overview
+  capabilities?: DeckCapability[] // overrides Mavixy's standard set
+  months: DeckMonth[]             // the phases (with deep-dives)
   services: DeckService[]         // the rows of the intensity matrix
   gstNote?: string
-  extras?: DeckExtra[]            // approach / measurement / terms / etc.
+  journeyTable?: DeckJourneyRow[] // the month-by-month summary table
+  firstThirtyDays?: DeckWeek[]    // week-by-week rollout
+  extras?: DeckExtra[]            // any extra custom sections
   closingHeadline?: string
+  closingBody?: string
 }
 
 export interface ChatTurn { role: 'user' | 'assistant'; text: string }

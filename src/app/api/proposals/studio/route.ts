@@ -46,26 +46,43 @@ YOU MUST REPLY AS A SINGLE JSON OBJECT, one of two shapes:
 { "mode": "ask", "message": "<one clear, specific follow-up question>" }
 Ask for ONE thing at a time. Prefer concrete asks ("What's the monthly fee for social in month 1?").
 
-2) When you have enough to draft (client, at least 1 month, services with prices):
+2) When you have enough to draft (client, phases, services with prices):
 { "mode": "draft",
-  "message": "<a short, friendly plain-text summary of the plan for the owner to approve — a few lines, mention months, the shifting focus, and the total>",
+  "message": "<a short, friendly plain-text summary for the owner to approve — mention the phases, the shifting focus, and the total>",
   "deck": {
     "clientName": "<Company>",
     "clientTagline": "<what they do, short>",
-    "promiseHeadline": "<e.g. '3-Month Digital Growth Plan'>",
+    "promiseHeadline": "<e.g. '2-Phase Digital Brand Building Plan'>",
     "promiseText": "<one sentence>",
-    "opportunityHeadline": "<reframe, ends with a period>",
+    "opportunityHeadline": "<reframe of their existing strength, ends with a period>",
     "opportunityBody": "<2-3 short sentences>",
-    "assets": [ {"label":"<thing they already have>"}, ... 3-4 ],
-    "months": [ {"key":"Month 1","focus":"Foundation","objective":"<one line>"}, ... ],
-    "services": [ {"name":"Social Media","cells":[ {"intensity":4,"price":35000}, {"intensity":3,"price":28000}, ... ]}, ... ],
-    "gstNote": "Service fees only. Ad spend is separate and paid directly to the platforms.",
-    "closingHeadline": "<warm closing line, ends with a period>"
+    "assets": [ {"label":"<thing they already have, 1-3 words>"}, ... 4 ],
+    "objective": { "headline":"<one line>", "steps":["Build the foundation","Create awareness","Generate demand", ...] },
+    "months": [
+      { "key":"Phase 1 · Months 1-3", "focus":"Foundation & Authority", "objective":"<one line>", "intro":"<1 short sentence>",
+        "activities":[
+          { "title":"Aggressive social media growth", "groups":[
+            {"heading":"Content","items":["Content strategy","Short-form video","Product storytelling","Educational content","Festival content"]},
+            {"heading":"Management","items":["Creative concepts","Graphic design","Video editing","Publishing","Community monitoring"]}
+          ]},
+          { "title":"Awareness campaigns", "groups":[ {"heading":"Our role","items":["Audience research","Campaign setup","Targeting","Retargeting"]} ]}
+        ],
+        "outcomes":[ {"title":"Brand visibility","text":"Greater digital exposure and familiarity."}, {"title":"Audience","text":"A growing, relevant audience."}, ... 4-6 ]
+      }, ...
+    ],
+    "services": [ {"name":"Social Media","cells":[ {"intensity":4,"price":35000}, {"intensity":2,"price":18000} ]}, ... ],
+    "gstNote":"Service fees only. Ad spend is separate and paid directly to the platforms.",
+    "journeyTable":[ {"period":"Months 1-3","focus":"Foundation","objective":"Build authority and audience"}, ... ],
+    "closingHeadline":"<warm closing line, ends with a period>",
+    "closingBody":"<2 short sentences>"
   }
 }
-RULES for the deck: every service's "cells" array MUST have exactly one entry per month, in order. intensity is 0-4. price is a plain integer in ₹ (0 when the service is Off that month). Use realistic Indian agency pricing consistent with what the owner told you; if they gave a monthly total but not the split, distribute it sensibly across services and say so in "message". Keep services to the ones actually in play. Do not invent a client name — if you don't have one, ask.
 
-KEEP IT COMPACT (this is critical — the deck must be short and visual, and the response must stay small): every string is short. promiseHeadline ≤ 7 words. opportunityHeadline ≤ 9 words. opportunityBody ≤ 2 short sentences. each objective ≤ 12 words. assets: 4 max, each 1-3 words. Omit "capabilities" entirely unless the owner asked for specific ones (a good default is filled in automatically). extras: at most 2, each with ≤ 4 short bullets. Never write long paragraphs. The whole "deck" object must be small.
+RULES for the matrix: every service's "cells" array MUST have exactly one entry per month/phase in "months", in order. intensity 0-4. price = integer ₹ (0 when Off). Use realistic Indian agency pricing matching what the owner said; if they gave a phase total but not the split, distribute it across services sensibly and say so in "message".
+
+DEPTH — this is what makes it a real Mavixy proposal, not a summary: for EACH phase give 2-3 "activities", and each activity 1-2 "groups" of 3-6 SHORT items (2-4 words each) — these are the concrete things you'll do (like the SAP/Aakar decks). Give each phase 4-6 "outcomes" (title + one short sentence). Fill "objective.steps" (4-6 short verbs) and "journeyTable" (one row per phase or month).
+
+DO NOT output "capabilities", the approach, the system flywheel, measurement, terms or "what you get" — Mavixy's standard versions of those are added automatically. Focus your tokens on the client-specific layer above. Keep every individual string short (headlines ≤ 9 words, items 2-4 words, sentences short) — depth comes from MANY short items, never long paragraphs. Do not invent a client name — if you don't have one, ask.
 
 ${ctx}`
 

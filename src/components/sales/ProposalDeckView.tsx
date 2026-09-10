@@ -1,5 +1,6 @@
 'use client'
-import { money, intensityMeta, monthTotal, deckTotal, DEFAULT_CAPABILITIES } from '@/lib/proposal'
+import { money, intensityMeta, monthTotal, deckTotal } from '@/lib/proposal'
+import { STD_CAPABILITIES, APPROACH, FLYWHEEL, MEASUREMENT, WHAT_YOU_GET, STD_TERMS } from '@/lib/proposal-content'
 import type { ProposalDeck } from '@/types'
 
 function k(n: number): string {
@@ -17,49 +18,43 @@ const WORD_PATH = 'M0,3.64h36.67v121.41H0V3.64ZM73.09,0c23.31,0,38.61,20.4,38.61
 function Word({ fill }: { fill: string }) {
   return <svg className="word" viewBox={WORD_VB} fill={fill} aria-label="Mavixy"><path d={WORD_PATH} /></svg>
 }
+function Spark({ cls }: { cls?: string }) {
+  return <svg className={cls} viewBox={SPARK} fill="currentColor"><path d={SPARK_PATH} /></svg>
+}
+function Head({ ix, eyebrow }: { ix: string; eyebrow: string }) {
+  return <div className="shead"><span className="ix">{ix}</span><span className="eyebrow">{eyebrow}</span></div>
+}
 
 export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
   const months = deck.months || []
   const services = deck.services || []
-  const caps = (deck.capabilities && deck.capabilities.length ? deck.capabilities : DEFAULT_CAPABILITIES).slice(0, 5)
+  const caps = (deck.capabilities && deck.capabilities.length ? deck.capabilities : STD_CAPABILITIES).slice(0, 5)
   const total = deckTotal(deck)
-
-  // Per-month top services (by intensity) for the phase cards.
   const phaseMix = months.map((_m, mi) =>
-    services
-      .map(s => ({ name: s.name, intensity: s.cells?.[mi]?.intensity || 0 }))
-      .filter(x => x.intensity > 0)
-      .sort((a, b) => b.intensity - a.intensity)
-      .slice(0, 4)
-  )
+    services.map(s => ({ name: s.name, intensity: s.cells?.[mi]?.intensity || 0 }))
+      .filter(x => x.intensity > 0).sort((a, b) => b.intensity - a.intensity).slice(0, 4))
+  const hasDeep = months.some(m => (m.activities && m.activities.length) || (m.outcomes && m.outcomes.length))
+
+  // running section numbers for the major narrative sections
+  let n = 0
+  const ix = () => String(++n).padStart(2, '0')
 
   return (
     <div className="mvx-deck">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" />
       <style>{CSS}</style>
       <div className="wrap">
-        <div className="bar">
-          <div className="brand"><Word fill="var(--ink)" /><small>Creative · Marketing · Technology</small></div>
-        </div>
+        <div className="bar"><div className="brand"><Word fill="var(--ink)" /><small>Creative · Marketing · Technology</small></div></div>
 
         {/* cover */}
         <div className="cover">
-          <div className="cover-top">
-            <Word fill="#F5EDE1" />
-            <div className="cover-date">Proposal</div>
-          </div>
+          <div className="cover-top"><Word fill="#F5EDE1" /><div className="cover-date">Proposal</div></div>
           <div className="cover-mid">
-            <div className="cover-eye">
-              <svg className="spark" viewBox={SPARK} fill="#FF5A00"><path d={SPARK_PATH} /></svg>
-              <span>Proposal for</span>
-            </div>
+            <div className="cover-eye"><svg className="spark" viewBox={SPARK} fill="#FF5A00"><path d={SPARK_PATH} /></svg><span>Proposal for</span></div>
             <h1>{deck.clientName}<span>.</span></h1>
             <div className="rule" />
             {(deck.promiseHeadline || deck.promiseText) && (
-              <div>
-                {deck.promiseHeadline && <div className="promise-h">{deck.promiseHeadline}</div>}
-                {deck.promiseText && <p className="promise">{deck.promiseText}</p>}
-              </div>
+              <div>{deck.promiseHeadline && <div className="promise-h">{deck.promiseHeadline}</div>}{deck.promiseText && <p className="promise">{deck.promiseText}</p>}</div>
             )}
           </div>
           <div className="meta">
@@ -69,20 +64,25 @@ export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
           </div>
         </div>
 
-        {/* opportunity */}
+        {/* opportunity + objective */}
         {(deck.opportunityHeadline || deck.opportunityBody) && (
           <section>
-            <div className="shead"><span className="ix">01</span><span className="eyebrow">The opportunity</span></div>
+            <Head ix={ix()} eyebrow="The opportunity" />
             {deck.opportunityHeadline && <h2 className="title">{deck.opportunityHeadline}</h2>}
             {deck.opportunityBody && <p className="lede">{deck.opportunityBody}</p>}
             {deck.assets && deck.assets.length > 0 && (
-              <div className="grid-hair assets" style={{ marginTop: 28 }}>
-                {deck.assets.slice(0, 4).map((a, i) => (
-                  <div key={i} className="cell-w">
-                    <svg className="ic" viewBox={SPARK} fill="currentColor"><path d={SPARK_PATH} /></svg>
-                    <h3>{a.label}</h3>
-                  </div>
-                ))}
+              <div className="grid-hair assets" style={{ marginTop: 26 }}>
+                {deck.assets.slice(0, 4).map((a, i) => <div key={i} className="cell-w"><Spark cls="ic" /><h3>{a.label}</h3></div>)}
+              </div>
+            )}
+            {deck.objective && deck.objective.steps?.length > 0 && (
+              <div style={{ marginTop: 30 }}>
+                {deck.objective.headline && <p className="lede" style={{ marginTop: 0, marginBottom: 16 }}>{deck.objective.headline}</p>}
+                <div className="objflow">
+                  {deck.objective.steps.map((s, i) => (
+                    <div key={i} className="objstep"><span className="oi">{String(i + 1).padStart(2, '0')}</span><span className="ot">{s}</span>{i < deck.objective!.steps.length - 1 && <span className="oa">→</span>}</div>
+                  ))}
+                </div>
               </div>
             )}
           </section>
@@ -90,79 +90,42 @@ export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
 
         {/* capabilities */}
         <section>
-          <div className="shead"><span className="ix">02</span><span className="eyebrow">What Mavixy does</span></div>
-          <h2 className="title">One partner. Every capability.</h2>
-          <div className="grid-hair caps" style={{ marginTop: 28 }}>
+          <Head ix={ix()} eyebrow="What Mavixy does" />
+          <h2 className="title">One partner. Multiple growth capabilities.</h2>
+          <p className="lede">Brands shouldn&apos;t coordinate five vendors for branding, website, content, ads and technology. The pieces sit together, so every part feeds the next.</p>
+          <div className="grid-hair caps" style={{ marginTop: 26 }}>
             {caps.map((c, i) => (
-              <div key={i} className="cell-w">
-                <svg className="ic" viewBox={SPARK} fill="currentColor"><path d={SPARK_PATH} /></svg>
-                <h3>{c.title}</h3>
-                <ul>{(c.items || []).slice(0, 4).map((it, j) => <li key={j}>{it}</li>)}</ul>
-              </div>
+              <div key={i} className="cell-w"><Spark cls="ic" /><h3>{c.title}</h3><ul>{(c.items || []).map((it, j) => <li key={j}>{it}</li>)}</ul></div>
             ))}
           </div>
         </section>
 
-        {/* the plan — intensity matrix */}
-        {services.length > 0 && months.length > 0 && (
-          <section>
-            <div className="shead"><span className="ix">03</span><span className="eyebrow">The plan</span></div>
-            <h2 className="title">Depth that moves with the goal.</h2>
-            <p className="lede">Every service runs at a different intensity each month. As the plan shifts objective, effort — and cost — moves with it. Built for {deck.clientName}, not off a price list.</p>
-            <div className="matrix-shell" style={{ marginTop: 28 }}>
-              <table className="matrix">
-                <thead>
-                  <tr>
-                    <th className="svc"><span className="eyebrow">Service</span></th>
-                    {months.map((m, i) => <th key={i}><span className="mk">{m.key}</span><span className="mf">{m.focus}</span></th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map((s, si) => (
-                    <tr key={si}>
-                      <td className="svc"><span className="dot" />{s.name}</td>
-                      {months.map((_m, mi) => {
-                        const cell = s.cells?.[mi] || { intensity: 0, price: 0 }
-                        const im = intensityMeta(cell.intensity)
-                        return (
-                          <td key={mi} className="cell">
-                            <div className={`lvl ${im.h}`}><span className="l">{im.label}</span><span className="v num">{k(cell.price)}</span></div>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td className="svc">Monthly investment</td>
-                    {months.map((_m, mi) => <td key={mi}><span className="tot num">{money(monthTotal(deck, mi))}</span><small>+ GST</small></td>)}
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <div className="legend">
-              {intensityLegend.map(l => <span key={l.h} className="k"><span className="sw" style={{ background: `var(--${l.h})` }} />{l.label}</span>)}
-            </div>
-          </section>
-        )}
+        {/* approach */}
+        <section>
+          <Head ix={ix()} eyebrow="The Mavixy approach" />
+          <h2 className="title">{APPROACH.headline}</h2>
+          <div className="approach">
+            <div className=" acol"><div className="eyebrow">A lot of marketing starts with</div><div className="aq dim">{APPROACH.from}</div></div>
+            <div className=" acol"><div className="eyebrow">We prefer to start with</div><div className="aq">{APPROACH.to}</div></div>
+          </div>
+          <div className="grid-hair" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginTop: 18 }}>
+            {APPROACH.loop.map((l, i) => <div key={i} className="cell-w"><h3>{l.k}</h3><p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>{l.v}</p></div>)}
+          </div>
+          <div className="note" style={{ marginTop: 18 }}><svg width="16" height="16" viewBox={SPARK} fill="var(--spark)" style={{ flexShrink: 0 }}><path d={SPARK_PATH} /></svg><p>{APPROACH.note}</p></div>
+        </section>
 
-        {/* phase cards */}
+        {/* roadmap overview */}
         {months.length > 0 && (
           <section>
-            <div className="shead"><span className="ix">04</span><span className="eyebrow">Month by month</span></div>
-            <h2 className="title">One plan, one direction.</h2>
-            <div className="phases" style={{ marginTop: 28 }}>
+            <Head ix={ix()} eyebrow="The roadmap" />
+            <h2 className="title">Stages of growth.</h2>
+            <p className="lede">Each phase prepares the foundation for the next, so every activity contributes to long-term growth rather than short-term visibility.</p>
+            <div className="phases" style={{ marginTop: 26 }}>
               {months.map((m, mi) => (
                 <div key={mi} className="phase">
-                  <span className="pk">{m.key}</span>
-                  <h3>{m.focus}</h3>
+                  <span className="pk">{m.key}</span><h3>{m.focus}</h3>
                   {m.objective && <p className="obj">{m.objective}</p>}
-                  <div className="mix">
-                    {phaseMix[mi].map((x, j) => (
-                      <div key={j} className="mixrow"><span>{x.name}</span><span className="bars">{[0, 1, 2, 3].map(b => <i key={b} className={b < x.intensity ? 'on' : ''} />)}</span></div>
-                    ))}
-                  </div>
+                  <div className="mix">{phaseMix[mi].map((x, j) => <div key={j} className="mixrow"><span>{x.name}</span><span className="bars">{[0, 1, 2, 3].map(b => <i key={b} className={b < x.intensity ? 'on' : ''} />)}</span></div>)}</div>
                   <div className="price"><span className="amt num">{money(monthTotal(deck, mi))}<span> + GST</span></span></div>
                 </div>
               ))}
@@ -170,36 +133,130 @@ export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
           </section>
         )}
 
-        {/* total */}
-        {total > 0 && (
-          <section>
-            <div className="total">
-              <div>
-                <span className="eyebrow">Total engagement{months.length ? ` · ${months.length} month${months.length > 1 ? 's' : ''}` : ''}</span>
-                <div className="big num">{money(total)}<span> + GST</span></div>
+        {/* per-phase deep dives */}
+        {hasDeep && months.map((m, mi) => (!m.activities?.length && !m.outcomes?.length) ? null : (
+          <section key={mi}>
+            <div className="shead"><span className="eyebrow" style={{ color: 'var(--spark)' }}>Phase {String(mi + 1).padStart(2, '0')} · {m.focus}</span></div>
+            <h2 className="title">What we&apos;ll do.</h2>
+            {m.intro && <p className="lede">{m.intro}</p>}
+            {(m.activities || []).map((a, ai) => (
+              <div key={ai} className="act">
+                <div className="act-h"><Spark cls="ic" /><h3>{a.title}</h3></div>
+                <div className="actgroups">
+                  {(a.groups || []).map((g, gi) => (
+                    <div key={gi} className="actgroup">
+                      <div className="agh">{g.heading}</div>
+                      <ul>{(g.items || []).map((it, ii) => <li key={ii}>{it}</li>)}</ul>
+                    </div>
+                  ))}
+                </div>
               </div>
+            ))}
+            {(m.outcomes || []).length > 0 && (
+              <>
+                <div className="subeye">Expected outcome</div>
+                <div className="outcomes">
+                  {(m.outcomes || []).map((o, oi) => (
+                    <div key={oi} className="oc"><span className="ocn">{String(oi + 1).padStart(2, '0')}</span><div><div className="oct">{o.title}</div><div className="ocx">{o.text}</div></div></div>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="phase-inv"><span className="eyebrow">Phase investment</span><span className="tot num">{money(monthTotal(deck, mi))} + GST</span></div>
+          </section>
+        ))}
+
+        {/* investment matrix */}
+        {services.length > 0 && months.length > 0 && (
+          <section>
+            <Head ix={ix()} eyebrow="The investment" />
+            <h2 className="title">Depth that moves with the goal.</h2>
+            <p className="lede">Every service runs at a different intensity each phase. As focus shifts, effort — and cost — moves with it. Built for {deck.clientName}, not off a price list.</p>
+            <div className="matrix-shell" style={{ marginTop: 26 }}>
+              <table className="matrix">
+                <thead><tr><th className="svc"><span className="eyebrow">Service</span></th>{months.map((m, i) => <th key={i}><span className="mk">{m.key}</span><span className="mf">{m.focus}</span></th>)}</tr></thead>
+                <tbody>
+                  {services.map((s, si) => (
+                    <tr key={si}>
+                      <td className="svc"><span className="dot" />{s.name}</td>
+                      {months.map((_m, mi) => { const c = s.cells?.[mi] || { intensity: 0, price: 0 }; const im = intensityMeta(c.intensity); return <td key={mi} className="cell"><div className={`lvl ${im.h}`}><span className="l">{im.label}</span><span className="v num">{k(c.price)}</span></div></td> })}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr><td className="svc">Investment</td>{months.map((_m, mi) => <td key={mi}><span className="tot num">{money(monthTotal(deck, mi))}</span><small>+ GST</small></td>)}</tr></tfoot>
+              </table>
+            </div>
+            <div className="legend">{legend.map(l => <span key={l.h} className="k"><span className="sw" style={{ background: `var(--${l.h})` }} />{l.label}</span>)}</div>
+            <div className="total" style={{ marginTop: 24 }}>
+              <div><span className="eyebrow">Total engagement</span><div className="big num">{money(total)}<span> + GST</span></div></div>
               <p className="rt">{deck.gstNote || 'Service fees only. Ad spend is separate and paid directly to the platforms.'}</p>
             </div>
           </section>
         )}
 
-        {/* extras */}
-        {(deck.extras || []).map((ex, i) => (
-          <section key={i}>
-            <div className="shead"><span className="ix">{String(5 + i).padStart(2, '0')}</span><span className="eyebrow">{ex.heading}</span></div>
-            {ex.body && <p className="lede">{ex.body}</p>}
-            {ex.bullets && ex.bullets.length > 0 && (
-              <div className="grid-hair" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', marginTop: 22 }}>
-                {ex.bullets.map((b, j) => <div key={j} className="cell-w"><h3 style={{ fontSize: 14 }}>{b}</h3></div>)}
-              </div>
-            )}
+        {/* journey table */}
+        {deck.journeyTable && deck.journeyTable.length > 0 && (
+          <section>
+            <Head ix={ix()} eyebrow="The journey" />
+            <h2 className="title">One direction.</h2>
+            <div className="jtable" style={{ marginTop: 22 }}>
+              <div className="jrow jhead"><span>Period</span><span>Focus</span><span>Primary objective</span></div>
+              {deck.journeyTable.map((r, i) => <div key={i} className="jrow"><span className="jp">{r.period}</span><span className="jf">{r.focus}</span><span className="jo">{r.objective}</span></div>)}
+            </div>
           </section>
-        ))}
+        )}
+
+        {/* measurement */}
+        <section>
+          <Head ix={ix()} eyebrow="What we'll measure" />
+          <h2 className="title">Success is not a follower count.</h2>
+          <div className="measure" style={{ marginTop: 24 }}>
+            {MEASUREMENT.map((l, i) => <div key={i} className="ml"><div className="mlh">{l.area}</div><ul>{l.items.map((it, j) => <li key={j}>{it}</li>)}</ul></div>)}
+          </div>
+        </section>
+
+        {/* how it connects */}
+        <section>
+          <Head ix={ix()} eyebrow="How the system connects" />
+          <h2 className="title">The advantage is how it works together.</h2>
+          <div className="fly" style={{ marginTop: 24 }}>
+            {FLYWHEEL.map((f, i) => <div key={i} className="fs"><span className="fn">{String(i + 1).padStart(2, '0')}</span><div className="fl">{f.label}</div><div className="ft">{f.text}</div></div>)}
+          </div>
+        </section>
+
+        {/* what you get */}
+        <section>
+          <Head ix={ix()} eyebrow="What you get" />
+          <h2 className="title">{WHAT_YOU_GET.headline}</h2>
+          <div className="chips" style={{ marginTop: 22 }}>{WHAT_YOU_GET.instead.map((c, i) => <span key={i} className="chip">{c}</span>)}</div>
+          <div className="chain" style={{ marginTop: 20 }}>{WHAT_YOU_GET.chain.map((c, i) => <div key={i} className="ci"><Spark cls="cic" /><span>{c}</span></div>)}</div>
+        </section>
+
+        {/* first 30 days */}
+        {deck.firstThirtyDays && deck.firstThirtyDays.length > 0 && (
+          <section>
+            <Head ix={ix()} eyebrow="The first 30 days" />
+            <h2 className="title">Week by week.</h2>
+            <div className="weeks" style={{ marginTop: 24 }}>
+              {deck.firstThirtyDays.map((w, i) => <div key={i} className="wk"><span className="wkn">{w.week}</span><div className="wkt">{w.title}</div><ul>{w.items.map((it, j) => <li key={j}>{it}</li>)}</ul></div>)}
+            </div>
+          </section>
+        )}
+
+        {/* terms */}
+        <section>
+          <Head ix={ix()} eyebrow="Terms & conditions" />
+          <h2 className="title">How we work together.</h2>
+          <div className="terms" style={{ marginTop: 24 }}>
+            {STD_TERMS.map((t, i) => <div key={i} className="tc"><span className="tcn">{String(i + 1).padStart(2, '0')}</span><div><div className="tch">{t.heading}</div><div className="tcb">{t.body}</div></div></div>)}
+          </div>
+        </section>
 
         {/* closing */}
         <section className="close">
-          <div className="shead"><span className="ix">{String(5 + (deck.extras?.length || 0)).padStart(2, '0')}</span><span className="eyebrow">Let&apos;s build it</span></div>
+          <Head ix={ix()} eyebrow="Let's build it" />
           <h2>{deck.closingHeadline || `Let's build the digital ${deck.clientName}.`}</h2>
+          {deck.closingBody && <p className="lede">{deck.closingBody}</p>}
           <div className="contact">
             <div><div className="eyebrow">Contact</div><p className="mono" style={{ marginTop: 8 }}>hey@mavixy.com<br />+91 96117 79996<br />www.mavixy.com</p></div>
             <div><div className="eyebrow">Studio</div><p className="mono" style={{ marginTop: 8 }}>475, 2nd Floor, Croissance Hub,<br />RBI Layout, JP Nagar 7th Phase,<br />Bengaluru 560078</p></div>
@@ -212,20 +269,10 @@ export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
   )
 }
 
-const intensityLegend = [
-  { h: 'h0', label: 'Off' }, { h: 'h1', label: 'Light' }, { h: 'h2', label: 'Medium' }, { h: 'h3', label: 'Heavy' }, { h: 'h4', label: 'Max' },
-]
+const legend = [{ h: 'h0', label: 'Off' }, { h: 'h1', label: 'Light' }, { h: 'h2', label: 'Medium' }, { h: 'h3', label: 'Heavy' }, { h: 'h4', label: 'Max' }]
 
 const CSS = `
-.mvx-deck{
-  --paper:#F5EDE1;--ink:#14110E;--body:#3A342C;--muted:#6B6153;--muted-2:#8B8073;
-  --line:#D6C7B0;--line-soft:#E4D8C4;--spark:#FF5A00;
-  --dark:#100E0C;--on-dark:#F5EDE1;--on-dark-dim:#B7AC9C;--on-dark-muted:#8B8073;--divider-dark:#332E28;
-  --h0:#EADFCD;--h1:#FFEADD;--h2:#FFD3B4;--h3:#FF9E6B;--h4:#FF5A00;
-  --on-h-lo:#8B4A1E;--on-h-mid:#4A2208;--on-h-hi:#F5EDE1;
-  --dsp:"Archivo",system-ui,sans-serif;--bdy:"Instrument Sans",system-ui,sans-serif;
-  background:var(--paper);color:var(--body);font-family:var(--bdy);font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased;
-}
+.mvx-deck{--paper:#F5EDE1;--ink:#14110E;--body:#3A342C;--muted:#6B6153;--muted-2:#8B8073;--line:#D6C7B0;--line-soft:#E4D8C4;--spark:#FF5A00;--dark:#100E0C;--on-dark:#F5EDE1;--on-dark-dim:#B7AC9C;--on-dark-muted:#8B8073;--divider-dark:#332E28;--h0:#EADFCD;--h1:#FFEADD;--h2:#FFD3B4;--h3:#FF9E6B;--h4:#FF5A00;--on-h-lo:#8B4A1E;--on-h-mid:#4A2208;--on-h-hi:#F5EDE1;--dsp:"Archivo",system-ui,sans-serif;--bdy:"Instrument Sans",system-ui,sans-serif;background:var(--paper);color:var(--body);font-family:var(--bdy);font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
 .mvx-deck *{box-sizing:border-box}
 .mvx-deck .wrap{max-width:1040px;margin:0 auto;padding-inline:22px}
 .mvx-deck h1,.mvx-deck h2,.mvx-deck h3{font-family:var(--dsp);color:var(--ink);margin:0;text-wrap:balance}
@@ -237,10 +284,11 @@ const CSS = `
 .mvx-deck .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:20px}
 .mvx-deck .brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
 .mvx-deck .brand small{font-family:var(--bdy);font-weight:600;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2)}
-.mvx-deck section{padding-block:clamp(40px,6vw,72px);border-top:1px solid var(--line-soft)}
+.mvx-deck section{padding-block:clamp(38px,5.5vw,66px);border-top:1px solid var(--line-soft)}
 .mvx-deck .shead{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
-.mvx-deck h2.title{font-weight:800;font-size:clamp(28px,4.4vw,41px);line-height:1.02;letter-spacing:-.035em;max-width:17ch}
-.mvx-deck .lede{color:var(--body);font-size:clamp(15px,1.5vw,16.5px);line-height:1.68;max-width:60ch;margin-top:14px}
+.mvx-deck h2.title{font-weight:800;font-size:clamp(27px,4.2vw,40px);line-height:1.03;letter-spacing:-.035em;max-width:18ch}
+.mvx-deck .lede{color:var(--body);font-size:clamp(15px,1.5vw,16.5px);line-height:1.68;max-width:62ch;margin-top:14px}
+.mvx-deck .subeye{font-family:var(--bdy);font-weight:600;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--spark);margin:30px 0 14px}
 .mvx-deck .cover{background:var(--dark);color:var(--on-dark);border-radius:22px;overflow:hidden;position:relative;padding:clamp(30px,4.6vw,52px);margin-top:8px;display:flex;flex-direction:column;gap:clamp(26px,4vw,42px)}
 .mvx-deck .cover::after{content:"";position:absolute;right:-140px;top:-100px;width:380px;height:380px;background:radial-gradient(circle,rgba(255,90,0,.20),transparent 65%);pointer-events:none}
 .mvx-deck .cover-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;position:relative;z-index:1}
@@ -262,38 +310,26 @@ const CSS = `
 .mvx-deck .grid-hair{display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
 .mvx-deck .assets{grid-template-columns:repeat(4,1fr)}
 .mvx-deck .caps{grid-template-columns:repeat(5,1fr)}
-.mvx-deck .cell-w{background:var(--paper);padding:22px 18px;display:flex;flex-direction:column;gap:12px}
-.mvx-deck .cell-w .ic{width:20px;height:20px;color:var(--spark)}
-.mvx-deck .cell-w h3{font-family:var(--dsp);font-weight:700;font-size:15.5px;letter-spacing:-.02em}
+.mvx-deck .cell-w{background:var(--paper);padding:20px 16px;display:flex;flex-direction:column;gap:11px}
+.mvx-deck .cell-w .ic{width:19px;height:19px;color:var(--spark)}
+.mvx-deck .cell-w h3{font-family:var(--dsp);font-weight:700;font-size:15px;letter-spacing:-.02em}
 .mvx-deck .cell-w ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.mvx-deck .cell-w li{font-size:12px;color:var(--muted);line-height:1.35}
-.mvx-deck .matrix-shell{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
-.mvx-deck .matrix{min-width:660px;width:100%;border-collapse:collapse}
-.mvx-deck .matrix th,.mvx-deck .matrix td{text-align:left;padding:0;vertical-align:middle}
-.mvx-deck .matrix thead th{padding:16px 14px 13px;border-bottom:1px solid var(--line)}
-.mvx-deck .matrix thead .mk{font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);display:block}
-.mvx-deck .matrix thead .mf{font-family:var(--dsp);font-weight:700;font-size:15px;letter-spacing:-.02em;color:var(--ink);display:block;margin-top:3px}
-.mvx-deck .svc{font-family:var(--dsp);font-weight:600;font-size:13.5px;color:var(--ink);letter-spacing:-.01em;padding:0 14px;white-space:nowrap}
-.mvx-deck .svc .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--spark);margin-right:10px;vertical-align:1px}
-.mvx-deck .matrix tbody tr{border-bottom:1px solid var(--line-soft)}
-.mvx-deck .cell{padding:7px 10px}
-.mvx-deck .lvl{border-radius:8px;padding:10px 12px;min-height:52px;display:flex;flex-direction:column;justify-content:center;gap:2px}
-.mvx-deck .lvl .l{font-family:var(--bdy);font-weight:600;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.9}
-.mvx-deck .lvl .v{font-family:var(--dsp);font-weight:700;font-size:15px;letter-spacing:-.01em}
-.mvx-deck .h0{background:var(--h0);color:var(--muted-2)}.mvx-deck .h1{background:var(--h1);color:var(--on-h-lo)}
-.mvx-deck .h2{background:var(--h2);color:var(--on-h-lo)}.mvx-deck .h3{background:var(--h3);color:var(--on-h-mid)}
-.mvx-deck .h4{background:var(--h4);color:var(--on-h-hi)}
-.mvx-deck .matrix tfoot td{padding:15px 14px;border-top:2px solid var(--ink)}
-.mvx-deck .matrix tfoot .svc{font-weight:800}
-.mvx-deck .tot{font-family:var(--dsp);font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.02em}
-.mvx-deck .tot small{display:block;font-family:var(--bdy);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);font-weight:600;margin-top:2px}
-.mvx-deck .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:15px;align-items:center}
-.mvx-deck .legend .k{display:inline-flex;align-items:center;gap:7px;font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.mvx-deck .legend .sw{width:16px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.05)}
+.mvx-deck .cell-w li{font-size:11.5px;color:var(--muted);line-height:1.35}
+.mvx-deck .objflow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.mvx-deck .objstep{display:inline-flex;align-items:center;gap:8px}
+.mvx-deck .objstep .oi{font-family:var(--dsp);font-weight:800;font-size:12px;color:var(--spark)}
+.mvx-deck .objstep .ot{font-family:var(--dsp);font-weight:700;font-size:14px;letter-spacing:-.02em;color:var(--ink)}
+.mvx-deck .objstep .oa{color:var(--line);margin-left:2px}
+.mvx-deck .approach{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px}
+.mvx-deck .acol{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--paper)}
+.mvx-deck .aq{font-family:var(--dsp);font-weight:700;font-size:19px;letter-spacing:-.02em;color:var(--ink);margin-top:8px}
+.mvx-deck .aq.dim{color:var(--muted-2)}
+.mvx-deck .note{display:flex;gap:11px;padding:15px 17px;background:#FBF4E9;border:1px solid var(--line-soft);border-left:3px solid var(--spark);border-radius:12px;font-size:13.5px;color:var(--body);line-height:1.55}
+.mvx-deck .note b{color:var(--spark)}
 .mvx-deck .phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .mvx-deck .phase{border:1px solid var(--line);border-radius:16px;padding:22px;background:var(--paper);display:flex;flex-direction:column;gap:13px}
 .mvx-deck .phase .pk{font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted-2)}
-.mvx-deck .phase h3{font-family:var(--dsp);font-weight:800;font-size:21px;letter-spacing:-.03em}
+.mvx-deck .phase h3{font-family:var(--dsp);font-weight:800;font-size:20px;letter-spacing:-.03em}
 .mvx-deck .phase .obj{font-size:13px;color:var(--muted);line-height:1.5}
 .mvx-deck .mix{display:flex;flex-direction:column;gap:8px;margin-top:2px}
 .mvx-deck .mixrow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;font-size:12.5px;color:var(--body)}
@@ -301,19 +337,91 @@ const CSS = `
 .mvx-deck .bars i{width:15px;height:8px;border-radius:2px;background:var(--h0);display:block}
 .mvx-deck .bars i.on{background:var(--spark)}
 .mvx-deck .phase .price{margin-top:auto;padding-top:13px;border-top:1px solid var(--line-soft)}
-.mvx-deck .phase .price .amt{font-family:var(--dsp);font-weight:800;font-size:24px;color:var(--ink);letter-spacing:-.03em}
+.mvx-deck .phase .price .amt{font-family:var(--dsp);font-weight:800;font-size:23px;color:var(--ink);letter-spacing:-.03em}
 .mvx-deck .phase .price .amt span{font-size:13px;color:var(--muted);font-weight:600}
-.mvx-deck .total{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:22px;background:var(--dark);color:var(--on-dark);border-radius:20px;padding:clamp(24px,4vw,38px);position:relative;overflow:hidden}
+.mvx-deck .act{margin-top:24px}
+.mvx-deck .act-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.mvx-deck .act-h .ic{width:20px;height:20px;color:var(--spark);flex-shrink:0}
+.mvx-deck .act-h h3{font-family:var(--dsp);font-weight:800;font-size:19px;letter-spacing:-.03em}
+.mvx-deck .actgroups{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.mvx-deck .actgroup{background:var(--paper);padding:16px 16px}
+.mvx-deck .agh{font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px}
+.mvx-deck .actgroup ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mvx-deck .actgroup li{font-size:13px;color:var(--ink);line-height:1.35;padding-left:14px;position:relative}
+.mvx-deck .actgroup li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--spark)}
+.mvx-deck .outcomes{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.mvx-deck .oc{display:flex;gap:11px}
+.mvx-deck .oc .ocn{font-family:var(--dsp);font-weight:800;font-size:13px;color:var(--spark);padding-top:2px}
+.mvx-deck .oct{font-family:var(--dsp);font-weight:700;font-size:15px;letter-spacing:-.02em;color:var(--ink)}
+.mvx-deck .ocx{font-size:12.5px;color:var(--muted);line-height:1.45;margin-top:3px}
+.mvx-deck .phase-inv{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:28px;padding:16px 18px;background:var(--dark);color:var(--on-dark);border-radius:13px}
+.mvx-deck .phase-inv .eyebrow{color:var(--on-dark-muted)}
+.mvx-deck .phase-inv .tot{font-family:var(--dsp);font-weight:800;font-size:19px;color:var(--on-dark);letter-spacing:-.02em}
+.mvx-deck .matrix-shell{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.mvx-deck .matrix{min-width:640px;width:100%;border-collapse:collapse}
+.mvx-deck .matrix th,.mvx-deck .matrix td{text-align:left;padding:0;vertical-align:middle}
+.mvx-deck .matrix thead th{padding:16px 14px 13px;border-bottom:1px solid var(--line)}
+.mvx-deck .matrix thead .mk{font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);display:block}
+.mvx-deck .matrix thead .mf{font-family:var(--dsp);font-weight:700;font-size:14px;letter-spacing:-.02em;color:var(--ink);display:block;margin-top:3px}
+.mvx-deck .svc{font-family:var(--dsp);font-weight:600;font-size:13px;color:var(--ink);letter-spacing:-.01em;padding:0 14px;white-space:nowrap}
+.mvx-deck .svc .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--spark);margin-right:10px;vertical-align:1px}
+.mvx-deck .matrix tbody tr{border-bottom:1px solid var(--line-soft)}
+.mvx-deck .cell{padding:7px 10px}
+.mvx-deck .lvl{border-radius:8px;padding:9px 12px;min-height:50px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.mvx-deck .lvl .l{font-family:var(--bdy);font-weight:600;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.9}
+.mvx-deck .lvl .v{font-family:var(--dsp);font-weight:700;font-size:15px;letter-spacing:-.01em}
+.mvx-deck .h0{background:var(--h0);color:var(--muted-2)}.mvx-deck .h1{background:var(--h1);color:var(--on-h-lo)}.mvx-deck .h2{background:var(--h2);color:var(--on-h-lo)}.mvx-deck .h3{background:var(--h3);color:var(--on-h-mid)}.mvx-deck .h4{background:var(--h4);color:var(--on-h-hi)}
+.mvx-deck .matrix tfoot td{padding:15px 14px;border-top:2px solid var(--ink)}
+.mvx-deck .matrix tfoot .svc{font-weight:800}
+.mvx-deck .tot{font-family:var(--dsp);font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.02em}
+.mvx-deck .tot small{display:block;font-family:var(--bdy);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);font-weight:600;margin-top:2px}
+.mvx-deck .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:15px;align-items:center}
+.mvx-deck .legend .k{display:inline-flex;align-items:center;gap:7px;font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mvx-deck .legend .sw{width:16px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.05)}
+.mvx-deck .total{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:22px;background:var(--dark);color:var(--on-dark);border-radius:18px;padding:clamp(22px,3.5vw,34px);position:relative;overflow:hidden}
 .mvx-deck .total::after{content:"";position:absolute;left:-120px;bottom:-140px;width:360px;height:360px;background:radial-gradient(circle,rgba(255,90,0,.16),transparent 66%);pointer-events:none}
 .mvx-deck .total .eyebrow{color:var(--spark)}
-.mvx-deck .total .big{font-family:var(--dsp);font-weight:800;font-size:clamp(34px,6vw,56px);line-height:1;letter-spacing:-.035em;margin-top:8px;color:var(--on-dark);position:relative;z-index:1}
+.mvx-deck .total .big{font-family:var(--dsp);font-weight:800;font-size:clamp(32px,5.5vw,52px);line-height:1;letter-spacing:-.035em;margin-top:8px;color:var(--on-dark);position:relative;z-index:1}
 .mvx-deck .total .big span{color:var(--spark)}
 .mvx-deck .total .rt{font-size:12.5px;max-width:33ch;color:var(--on-dark-dim);line-height:1.55;position:relative;z-index:1}
-.mvx-deck .close h2{font-family:var(--dsp);font-weight:800;font-size:clamp(30px,5.2vw,50px);line-height:1;letter-spacing:-.035em;max-width:16ch}
+.mvx-deck .jtable{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mvx-deck .jrow{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line-soft);align-items:center}
+.mvx-deck .jrow:last-child{border-bottom:none}
+.mvx-deck .jhead{background:#EFE6D7}.mvx-deck .jhead span{font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.mvx-deck .jp{font-family:var(--dsp);font-weight:700;font-size:13.5px;color:var(--ink)}
+.mvx-deck .jf{font-weight:600;font-size:13px;color:var(--spark)}
+.mvx-deck .jo{font-size:13px;color:var(--muted)}
+.mvx-deck .measure{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.mvx-deck .ml{background:var(--paper);padding:18px 16px}
+.mvx-deck .mlh{font-family:var(--dsp);font-weight:700;font-size:15px;letter-spacing:-.02em;color:var(--ink);margin-bottom:11px}
+.mvx-deck .ml ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mvx-deck .ml li{font-size:12.5px;color:var(--muted);line-height:1.35}
+.mvx-deck .fly{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.mvx-deck .fs{border:1px solid var(--line);border-radius:13px;padding:16px}
+.mvx-deck .fn{font-family:var(--dsp);font-weight:800;font-size:12px;color:var(--spark)}
+.mvx-deck .fl{font-family:var(--dsp);font-weight:700;font-size:16px;letter-spacing:-.02em;color:var(--ink);margin-top:8px}
+.mvx-deck .ft{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+.mvx-deck .chips{display:flex;flex-wrap:wrap;gap:9px}
+.mvx-deck .chip{background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:8px 15px;font-size:13px;font-weight:600;color:var(--ink)}
+.mvx-deck .chain{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.mvx-deck .ci{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--body)}
+.mvx-deck .cic{width:12px;height:12px;color:var(--spark);flex-shrink:0}
+.mvx-deck .weeks{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.mvx-deck .wk{background:var(--paper);padding:18px 16px}
+.mvx-deck .wkn{font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted-2)}
+.mvx-deck .wkt{font-family:var(--dsp);font-weight:700;font-size:15px;letter-spacing:-.02em;color:var(--ink);margin:6px 0 10px}
+.mvx-deck .wk ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.mvx-deck .wk li{font-size:12.5px;color:var(--muted);line-height:1.35}
+.mvx-deck .terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+.mvx-deck .tc{display:flex;gap:11px}
+.mvx-deck .tcn{font-family:var(--dsp);font-weight:800;font-size:13px;color:var(--spark);padding-top:2px}
+.mvx-deck .tch{font-family:var(--dsp);font-weight:700;font-size:14.5px;letter-spacing:-.02em;color:var(--ink)}
+.mvx-deck .tcb{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:3px}
+.mvx-deck .close h2{font-family:var(--dsp);font-weight:800;font-size:clamp(30px,5vw,48px);line-height:1;letter-spacing:-.035em;max-width:16ch;margin-top:4px}
 .mvx-deck .close h2 span{color:var(--spark)}
 .mvx-deck .contact{display:flex;flex-wrap:wrap;gap:28px 52px;margin-top:28px}
 .mvx-deck .contact .mono{font-size:13px;line-height:1.7;color:var(--body)}
 .mvx-deck footer{padding-block:26px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;font-family:var(--bdy);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
-@media (max-width:820px){.mvx-deck .caps{grid-template-columns:repeat(2,1fr)}.mvx-deck .meta{grid-template-columns:1fr}}
-@media (max-width:520px){.mvx-deck .assets{grid-template-columns:repeat(2,1fr)}.mvx-deck .caps{grid-template-columns:1fr}}
+@media (max-width:820px){.mvx-deck .caps{grid-template-columns:repeat(2,1fr)}.mvx-deck .meta,.mvx-deck .approach{grid-template-columns:1fr}}
+@media (max-width:520px){.mvx-deck .assets{grid-template-columns:repeat(2,1fr)}.mvx-deck .caps{grid-template-columns:1fr}.mvx-deck .jrow{grid-template-columns:1fr}}
 `
