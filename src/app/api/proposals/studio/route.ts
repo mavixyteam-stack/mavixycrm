@@ -67,20 +67,27 @@ Ask for ONE thing at a time. Prefer concrete asks ("What's the monthly fee for s
           ]},
           { "title":"Awareness campaigns", "groups":[ {"heading":"Our role","items":["Audience research","Campaign setup","Targeting","Retargeting"]} ]}
         ],
-        "outcomes":[ {"title":"Brand visibility","text":"Greater digital exposure and familiarity."}, {"title":"Audience","text":"A growing, relevant audience."}, ... 4-6 ]
-      }, ...
+        "outcomes":[ {"title":"Brand visibility","text":"Greater digital exposure and familiarity."}, {"title":"Audience","text":"A growing, relevant audience."} ],
+        "investment":[
+          {"label":"Aggressive social media management","value":"₹35,000 + GST / month"},
+          {"label":"Awareness campaign management","value":"Included"},
+          {"label":"Premium shoot","value":"₹20,000 + GST / month"},
+          {"label":"Recommended Meta ad budget","value":"₹10,000–₹15,000 / month"}
+        ],
+        "investmentTotal":"₹56,000 + GST / month",
+        "billing":"per month",
+        "budgetNote":"Media budget is separate from Mavixy's service fee and is paid directly to Meta."
+      }
     ],
-    "services": [ {"name":"Social Media","cells":[ {"intensity":4,"price":35000}, {"intensity":2,"price":18000} ]}, ... ],
-    "gstNote":"Service fees only. Ad spend is separate and paid directly to the platforms.",
-    "journeyTable":[ {"period":"Months 1-3","focus":"Foundation","objective":"Build authority and audience"}, ... ],
+    "journeyTable":[ {"period":"Months 1-3","focus":"Foundation","objective":"Build authority and audience"} ],
     "closingHeadline":"<warm closing line, ends with a period>",
     "closingBody":"<2 short sentences>"
   }
 }
 
-RULES for the matrix: every service's "cells" array MUST have exactly one entry per month/phase in "months", in order. intensity 0-4. price = integer ₹ (0 when Off). Use realistic Indian agency pricing matching what the owner said; if they gave a phase total but not the split, distribute it across services sensibly and say so in "message".
+PRICING — present it EXACTLY like a Mavixy deck (this is important, the owner is particular about it): pricing lives INSIDE each phase as an investment table, never as a grid or matrix. For each phase fill "investment" with rows {label, value} where value is a display string like "₹35,000 + GST / month", "₹20,000 + GST", "Included", or a range "₹10,000–₹15,000 / month". Add "investmentTotal" (a string, may be a range), "billing" ("one time" for setup phases, "per month" for ongoing), and — whenever ads run — a separate ad/media budget row PLUS a "budgetNote" saying the ad budget is paid directly to the platform, not Mavixy. Use the owner's actual numbers. The shift in focus shows through the numbers themselves (e.g. "Aggressive social ₹35,000" in an early phase vs "Strategic social ₹20,000" later).
 
-DEPTH — this is what makes it a real Mavixy proposal, not a summary: for EACH phase give 2-3 "activities", and each activity 1-2 "groups" of 3-6 SHORT items (2-4 words each) — these are the concrete things you'll do (like the SAP/Aakar decks). Give each phase 4-6 "outcomes" (title + one short sentence). Fill "objective.steps" (4-6 short verbs) and "journeyTable" (one row per phase or month).
+DEPTH — this is what makes it a real Mavixy proposal, not a summary: for EACH phase give 2-3 "activities", and each activity 1-2 "groups" of 3-6 SHORT items (2-4 words each) — the concrete things you'll do (like the SAP/Aakar decks). Give each phase 4-6 "outcomes" (title + one short sentence). Fill "objective.steps" (4-6 short verbs) and "journeyTable" (one row per phase).
 
 DO NOT output "capabilities", the approach, the system flywheel, measurement, terms or "what you get" — Mavixy's standard versions of those are added automatically. Focus your tokens on the client-specific layer above. Keep every individual string short (headlines ≤ 9 words, items 2-4 words, sentences short) — depth comes from MANY short items, never long paragraphs. Do not invent a client name — if you don't have one, ask.
 

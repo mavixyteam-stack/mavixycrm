@@ -183,13 +183,18 @@ export interface DeckCapability { title: string; items: string[] }
 export interface DeckActivityGroup { heading: string; items: string[] }
 export interface DeckActivity { title: string; groups: DeckActivityGroup[] }
 export interface DeckOutcome { title: string; text: string }
+export interface DeckInvestRow { label: string; value: string }   // value is a display string, e.g. "₹35,000 + GST / month", "Included", "₹10,000–₹15,000 / month"
 export interface DeckMonth {
-  key: string                     // "Month 1" / "Months 2-3"
+  key: string                     // "Month 1" / "Phase 1 · Months 1-3"
   focus: string                   // "Foundation"
   objective?: string              // one-line objective
   intro?: string                  // short phase intro
   activities?: DeckActivity[]     // the "What we'll do" deep-dive
   outcomes?: DeckOutcome[]        // the "Expected outcome" grid
+  investment?: DeckInvestRow[]    // the "Phase investment" table (activity → ₹)
+  investmentTotal?: string        // e.g. "₹65,000–₹70,000 + GST"
+  billing?: string                // "one time" | "per month"
+  budgetNote?: string             // ad/media budget note
 }
 export interface DeckCell { intensity: number; price: number }   // intensity 0–4 (Off→Max)
 export interface DeckService { name: string; cells: DeckCell[] } // cells align 1:1 with months

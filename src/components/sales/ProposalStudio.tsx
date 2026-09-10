@@ -153,7 +153,7 @@ export default function ProposalStudio({ journey, existing, onClose }: {
                 {deck && !loading && (
                   <div style={{ alignSelf: 'stretch', background: '#FBF4E9', border: '1px solid #E4D8C4', borderLeft: '3px solid #FF5A00', borderRadius: 12, padding: '14px 16px', marginTop: 4 }}>
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: '#14110E' }}>Draft ready — {deck.clientName}</div>
-                    <div style={{ fontSize: 12.5, color: '#6B6153', marginTop: 3 }}>{deck.months?.length || 0} month(s) · total {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(deckTotal(deck))} + GST</div>
+                    <div style={{ fontSize: 12.5, color: '#6B6153', marginTop: 3 }}>{deck.months?.length || 0} phase(s){deck.months?.[0]?.investmentTotal ? ` · from ${deck.months[0].investmentTotal}` : ''} · preview the full deck</div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                       <button onClick={() => setPreview(true)} style={{ fontSize: 13, fontWeight: 700, color: '#14110E', background: '#fff', border: '1.5px solid #D6C7B0', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Preview deck</button>
                       {!approved

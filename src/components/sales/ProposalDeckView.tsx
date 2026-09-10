@@ -1,14 +1,6 @@
 'use client'
-import { money, intensityMeta, monthTotal, deckTotal } from '@/lib/proposal'
 import { STD_CAPABILITIES, APPROACH, FLYWHEEL, MEASUREMENT, WHAT_YOU_GET, STD_TERMS } from '@/lib/proposal-content'
 import type { ProposalDeck } from '@/types'
-
-function k(n: number): string {
-  if (!n) return '—'
-  if (n >= 100000) return `₹${(n / 100000).toFixed(n % 100000 ? 1 : 0)}L`
-  if (n >= 1000) return `₹${Math.round(n / 1000)}k`
-  return `₹${n}`
-}
 
 const SPARK = '807 75.9 49.5 49.5'
 const SPARK_PATH = 'M831.88,125.05h0c0-13.49-10.94-24.42-24.42-24.42h0c13.49,0,24.42-10.94,24.42-24.43h0c0,13.49,10.94,24.42,24.42,24.42h0c-13.49,0-24.42,10.94-24.42,24.43Z'
@@ -27,13 +19,9 @@ function Head({ ix, eyebrow }: { ix: string; eyebrow: string }) {
 
 export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
   const months = deck.months || []
-  const services = deck.services || []
   const caps = (deck.capabilities && deck.capabilities.length ? deck.capabilities : STD_CAPABILITIES).slice(0, 5)
-  const total = deckTotal(deck)
-  const phaseMix = months.map((_m, mi) =>
-    services.map(s => ({ name: s.name, intensity: s.cells?.[mi]?.intensity || 0 }))
-      .filter(x => x.intensity > 0).sort((a, b) => b.intensity - a.intensity).slice(0, 4))
   const hasDeep = months.some(m => (m.activities && m.activities.length) || (m.outcomes && m.outcomes.length))
+  const hasInvest = months.some(m => (m.investment && m.investment.length) || m.investmentTotal)
 
   // running section numbers for the major narrative sections
   let n = 0
@@ -125,8 +113,7 @@ export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
                 <div key={mi} className="phase">
                   <span className="pk">{m.key}</span><h3>{m.focus}</h3>
                   {m.objective && <p className="obj">{m.objective}</p>}
-                  <div className="mix">{phaseMix[mi].map((x, j) => <div key={j} className="mixrow"><span>{x.name}</span><span className="bars">{[0, 1, 2, 3].map(b => <i key={b} className={b < x.intensity ? 'on' : ''} />)}</span></div>)}</div>
-                  <div className="price"><span className="amt num">{money(monthTotal(deck, mi))}<span> + GST</span></span></div>
+                  {m.investmentTotal && <div className="price"><span className="amt num">{m.investmentTotal}</span>{m.billing && <span className="pb"> · {m.billing}</span>}</div>}
                 </div>
               ))}
             </div>
@@ -162,35 +149,34 @@ export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
                 </div>
               </>
             )}
-            <div className="phase-inv"><span className="eyebrow">Phase investment</span><span className="tot num">{money(monthTotal(deck, mi))} + GST</span></div>
+            {(m.investment && m.investment.length > 0) && (
+              <>
+                <div className="subeye">Phase investment{m.billing ? ` · ${m.billing}` : ''}</div>
+                <div className="invtable">
+                  {m.investment.map((r, ri) => <div key={ri} className="invrow"><span className="invl">{r.label}</span><span className="invv num">{r.value}</span></div>)}
+                  {m.investmentTotal && <div className="invrow invtot"><span className="invl">{m.billing === 'one time' ? 'Phase total' : 'Monthly investment'}</span><span className="invv num">{m.investmentTotal}</span></div>}
+                </div>
+                {m.budgetNote && <p className="invnote">{m.budgetNote}</p>}
+              </>
+            )}
           </section>
         ))}
 
-        {/* investment matrix */}
-        {services.length > 0 && months.length > 0 && (
+        {/* investment at a glance */}
+        {hasInvest && months.length > 0 && (
           <section>
             <Head ix={ix()} eyebrow="The investment" />
-            <h2 className="title">Depth that moves with the goal.</h2>
-            <p className="lede">Every service runs at a different intensity each phase. As focus shifts, effort — and cost — moves with it. Built for {deck.clientName}, not off a price list.</p>
-            <div className="matrix-shell" style={{ marginTop: 26 }}>
-              <table className="matrix">
-                <thead><tr><th className="svc"><span className="eyebrow">Service</span></th>{months.map((m, i) => <th key={i}><span className="mk">{m.key}</span><span className="mf">{m.focus}</span></th>)}</tr></thead>
-                <tbody>
-                  {services.map((s, si) => (
-                    <tr key={si}>
-                      <td className="svc"><span className="dot" />{s.name}</td>
-                      {months.map((_m, mi) => { const c = s.cells?.[mi] || { intensity: 0, price: 0 }; const im = intensityMeta(c.intensity); return <td key={mi} className="cell"><div className={`lvl ${im.h}`}><span className="l">{im.label}</span><span className="v num">{k(c.price)}</span></div></td> })}
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot><tr><td className="svc">Investment</td>{months.map((_m, mi) => <td key={mi}><span className="tot num">{money(monthTotal(deck, mi))}</span><small>+ GST</small></td>)}</tr></tfoot>
-              </table>
+            <h2 className="title">Investment at a glance.</h2>
+            <div className="jtable" style={{ marginTop: 22 }}>
+              <div className="jrow jhead" style={{ gridTemplateColumns: '1fr 1fr 1.4fr' }}><span>Phase</span><span>Focus</span><span>Investment</span></div>
+              {months.map((m, mi) => (
+                <div key={mi} className="jrow" style={{ gridTemplateColumns: '1fr 1fr 1.4fr' }}>
+                  <span className="jp">{m.key}</span><span className="jf">{m.focus}</span>
+                  <span className="jo num" style={{ fontWeight: 700, color: 'var(--ink)' }}>{m.investmentTotal || '—'}{m.billing ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> · {m.billing}</span> : null}</span>
+                </div>
+              ))}
             </div>
-            <div className="legend">{legend.map(l => <span key={l.h} className="k"><span className="sw" style={{ background: `var(--${l.h})` }} />{l.label}</span>)}</div>
-            <div className="total" style={{ marginTop: 24 }}>
-              <div><span className="eyebrow">Total engagement</span><div className="big num">{money(total)}<span> + GST</span></div></div>
-              <p className="rt">{deck.gstNote || 'Service fees only. Ad spend is separate and paid directly to the platforms.'}</p>
-            </div>
+            <p className="invnote" style={{ marginTop: 14 }}>{deck.gstNote || 'Service fees are exclusive of GST. Meta & Google ad budgets are separate and paid directly to the platforms.'}</p>
           </section>
         )}
 
@@ -269,8 +255,6 @@ export default function ProposalDeckView({ deck }: { deck: ProposalDeck }) {
   )
 }
 
-const legend = [{ h: 'h0', label: 'Off' }, { h: 'h1', label: 'Light' }, { h: 'h2', label: 'Medium' }, { h: 'h3', label: 'Heavy' }, { h: 'h4', label: 'Max' }]
-
 const CSS = `
 .mvx-deck{--paper:#F5EDE1;--ink:#14110E;--body:#3A342C;--muted:#6B6153;--muted-2:#8B8073;--line:#D6C7B0;--line-soft:#E4D8C4;--spark:#FF5A00;--dark:#100E0C;--on-dark:#F5EDE1;--on-dark-dim:#B7AC9C;--on-dark-muted:#8B8073;--divider-dark:#332E28;--h0:#EADFCD;--h1:#FFEADD;--h2:#FFD3B4;--h3:#FF9E6B;--h4:#FF5A00;--on-h-lo:#8B4A1E;--on-h-mid:#4A2208;--on-h-hi:#F5EDE1;--dsp:"Archivo",system-ui,sans-serif;--bdy:"Instrument Sans",system-ui,sans-serif;background:var(--paper);color:var(--body);font-family:var(--bdy);font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
 .mvx-deck *{box-sizing:border-box}
@@ -337,8 +321,17 @@ const CSS = `
 .mvx-deck .bars i{width:15px;height:8px;border-radius:2px;background:var(--h0);display:block}
 .mvx-deck .bars i.on{background:var(--spark)}
 .mvx-deck .phase .price{margin-top:auto;padding-top:13px;border-top:1px solid var(--line-soft)}
-.mvx-deck .phase .price .amt{font-family:var(--dsp);font-weight:800;font-size:23px;color:var(--ink);letter-spacing:-.03em}
-.mvx-deck .phase .price .amt span{font-size:13px;color:var(--muted);font-weight:600}
+.mvx-deck .phase .price .amt{font-family:var(--dsp);font-weight:800;font-size:20px;color:var(--ink);letter-spacing:-.03em}
+.mvx-deck .phase .price .pb{font-size:12px;color:var(--muted);font-weight:600}
+.mvx-deck .invtable{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mvx-deck .invrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;border-bottom:1px solid var(--line-soft)}
+.mvx-deck .invrow:last-child{border-bottom:none}
+.mvx-deck .invl{font-size:14px;color:var(--ink);font-weight:500}
+.mvx-deck .invv{font-family:var(--dsp);font-weight:700;font-size:14.5px;color:var(--ink);letter-spacing:-.01em;white-space:nowrap;text-align:right}
+.mvx-deck .invtot{background:var(--dark);border-bottom:none}
+.mvx-deck .invtot .invl{color:var(--on-dark);font-weight:600}
+.mvx-deck .invtot .invv{color:var(--spark);font-size:17px}
+.mvx-deck .invnote{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:12px;max-width:70ch}
 .mvx-deck .act{margin-top:24px}
 .mvx-deck .act-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .mvx-deck .act-h .ic{width:20px;height:20px;color:var(--spark);flex-shrink:0}
