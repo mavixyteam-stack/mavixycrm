@@ -172,6 +172,10 @@ CREATE INDEX IF NOT EXISTS journeys_stage_idx ON journeys (stage);
 ALTER TABLE journeys ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "mavixy_journeys" ON journeys;
 CREATE POLICY "mavixy_journeys" ON journeys FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- Lead-triage fields folded in from the old Leads screen
+ALTER TABLE journeys ADD COLUMN IF NOT EXISTS score TEXT;
+ALTER TABLE journeys ADD COLUMN IF NOT EXISTS lead_status TEXT;
+ALTER TABLE journeys ADD COLUMN IF NOT EXISTS budget_text TEXT;
 
 -- Proposals: line-item proposals with a shareable public link the client accepts
 CREATE TABLE IF NOT EXISTS proposals (

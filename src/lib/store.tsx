@@ -460,7 +460,7 @@ export function useUpsertDeal() {
         title: isLead ? 'New lead assigned' : 'New deal assigned',
         text: `${assigner} assigned you ${isLead ? 'a lead' : 'a deal'}: ${deal.name}${deal.company ? ` · ${deal.company}` : ''}`,
         type: 'info',
-        link: isLead ? 'leads' : 'pipeline',
+        link: 'journey',
       })
     }
   }, [state, dispatch, errToast])

@@ -14,8 +14,6 @@ import DayPlanner from '@/components/work/DayPlanner'
 import ClientsScreen from '@/components/accounts/ClientsScreen'
 import ClientDetail from '@/components/accounts/ClientDetail'
 import ReportsScreen from '@/components/accounts/ReportsScreen'
-import PipelineScreen from '@/components/sales/PipelineScreen'
-import LeadsScreen from '@/components/sales/LeadsScreen'
 import ClientJourney from '@/components/sales/ClientJourney'
 import InvoicesScreen from '@/components/sales/InvoicesScreen'
 import TeamScreen from '@/components/org/TeamScreen'
@@ -66,8 +64,9 @@ const SCREEN_PATHS: Record<string, Screen> = {
   '/marketing': 'dmboard',
   '/clients': 'clients',
   '/reports': 'reports',
-  '/pipeline': 'pipeline',
-  '/leads': 'leads',
+  // Legacy Sales URLs now redirect into the unified Client Journey
+  '/pipeline': 'journey',
+  '/leads': 'journey',
   '/journey': 'journey',
   '/invoices': 'invoices',
   '/team': 'team',
@@ -89,8 +88,6 @@ const SCREEN_TO_PATH: Partial<Record<Screen, string>> = {
   dmboard: '/marketing',
   clients: '/clients',
   reports: '/reports',
-  pipeline: '/pipeline',
-  leads: '/leads',
   journey: '/journey',
   invoices: '/invoices',
   team: '/team',
@@ -210,8 +207,6 @@ function AppShell() {
       case 'clients':     return <ClientsScreen />
       case 'client-detail': return <ClientDetail />
       case 'reports':     return <ReportsScreen />
-      case 'pipeline':    return <PipelineScreen />
-      case 'leads':       return <LeadsScreen />
       case 'journey':     return <ClientJourney />
       case 'invoices':    return <InvoicesScreen />
       case 'team':        return <TeamScreen />

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { useApp, useToast, useUpsertJourney, useDeleteJourney } from '@/lib/store'
+import { useApp, useToast, useUpsertJourney, useDeleteJourney, useReloadWorkspace } from '@/lib/store'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { X } from '@/components/ui/Icon'
 import {
@@ -12,6 +12,15 @@ import { CONTRACT_STATUS } from '@/lib/contract'
 import ProposalBuilder from './ProposalBuilder'
 import ContractBuilder from './ContractBuilder'
 import type { Journey, JourneyStage, Proposal, Contract } from '@/types'
+
+const SCORE_STYLE: Record<string, { c: string; bg: string; label: string }> = {
+  hot: { c: '#DC2626', bg: '#FEE2E2', label: 'Hot' },
+  warm: { c: '#C99211', bg: '#FCF3D9', label: 'Warm' },
+  cold: { c: '#2563EB', bg: '#EAF1FF', label: 'Cold' },
+}
+const SCORE_RANK: Record<string, number> = { hot: 3, warm: 2, cold: 1 }
+// The early, triage-friendly stages that show up in the Leads view.
+const LEAD_STAGES: JourneyStage[] = ['lead', 'prospect']
 
 const todayStr = () => {
   const d = new Date()
@@ -34,6 +43,7 @@ export default function ClientJourney() {
   const toast = useToast()
   const upsert = useUpsertJourney()
   const remove = useDeleteJourney()
+  const reload = useReloadWorkspace()
 
   const [editing, setEditing] = useState<Journey | null>(null)
   const [isNew, setIsNew] = useState(false)
@@ -42,18 +52,36 @@ export default function ClientJourney() {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [showLost, setShowLost] = useState(false)
+  const [view, setView] = useState<'board' | 'leads'>('board')
+  const [importing, setImporting] = useState(false)
   const [proposalCtx, setProposalCtx] = useState<{ journey: Journey; existing: Proposal | null } | null>(null)
   const [contractCtx, setContractCtx] = useState<{ journey: Journey; existing: Contract | null } | null>(null)
 
   const me = state.currentUser?.id
+  const role = state.currentUser?.role || 'sales'
+  const canFinance = role === 'owner' || role === 'manager'  // proposals/contracts/invoices + all-owner view
   const owners = state.users.filter(u => ['owner', 'manager', 'sales'].includes(u.role))
   const person = (id?: string | null) => state.users.find(u => u.id === id)
   const latestProposal = (jid: string) => state.proposals
     .filter(p => p.journey_id === jid)
     .sort((a, b) => (b.created_at > a.created_at ? 1 : -1))[0]
 
-  const all = state.journeys
+  // Sales see only the accounts they own; leadership sees everyone (with a filter).
+  const all = canFinance ? state.journeys : state.journeys.filter(j => j.owner_id === me)
   const visible = ownerFilter === 'all' ? all : all.filter(j => j.owner_id === ownerFilter)
+
+  // Old Leads/Pipeline deals not yet folded into the journey (owner/manager only).
+  const unimported = canFinance ? state.deals.filter(d => !state.journeys.some(j => j.id === d.id)) : []
+
+  async function importDeals() {
+    setImporting(true)
+    try {
+      const res = await fetch('/api/admin/import-deals', { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok) { await reload(); toast(`Imported ${d.imported} from your old pipeline ✓`) }
+      else toast(`Import failed: ${d.error || 'error'}`)
+    } finally { setImporting(false) }
+  }
 
   // ── Pipeline analytics ──────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -118,21 +146,50 @@ export default function ClientJourney() {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, letterSpacing: '-0.02em' }}>Lead to loyal client</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ position: 'relative' }}>
-            <select value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}
-              style={{ appearance: 'none', WebkitAppearance: 'none', background: '#fff', border: '1.5px solid var(--c-border)', borderRadius: 11, padding: '9px 34px 9px 13px', fontSize: 13.5, fontWeight: 600, color: 'var(--c-ink)', cursor: 'pointer' }}>
-              <option value="all">All owners</option>
-              {owners.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-faint)" strokeWidth="2.4" strokeLinecap="round" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><path d="m6 9 6 6 6-6" /></svg>
+          {/* View switcher */}
+          <div style={{ display: 'flex', gap: 3, background: 'var(--c-fill)', borderRadius: 10, padding: 3 }}>
+            {([['board', 'Board'], ['leads', 'Leads']] as const).map(([k, label]) => {
+              const sel = view === k
+              return (
+                <button key={k} onClick={() => setView(k)}
+                  style={{ padding: '7px 14px', borderRadius: 7, fontSize: 12.5, fontWeight: 700, background: sel ? '#fff' : 'transparent', color: sel ? 'var(--c-ink)' : 'var(--c-muted)', boxShadow: sel ? '0 1px 3px rgba(0,0,0,.1)' : 'none', border: 'none', cursor: 'pointer' }}>
+                  {label}
+                </button>
+              )
+            })}
           </div>
+          {canFinance && (
+            <div style={{ position: 'relative' }}>
+              <select value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}
+                style={{ appearance: 'none', WebkitAppearance: 'none', background: '#fff', border: '1.5px solid var(--c-border)', borderRadius: 11, padding: '9px 34px 9px 13px', fontSize: 13.5, fontWeight: 600, color: 'var(--c-ink)', cursor: 'pointer' }}>
+                <option value="all">All owners</option>
+                {owners.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-faint)" strokeWidth="2.4" strokeLinecap="round" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><path d="m6 9 6 6 6-6" /></svg>
+            </div>
+          )}
           <button onClick={openNew}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'var(--c-accent)', color: '#fff', borderRadius: 11, padding: '10px 16px', fontWeight: 700, fontSize: 13.5, border: 'none', cursor: 'pointer' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-            New opportunity
+            {view === 'leads' ? 'New lead' : 'New opportunity'}
           </button>
         </div>
       </div>
+
+      {/* Import banner — fold the old Leads/Pipeline in */}
+      {unimported.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 13, padding: '12px 16px', marginBottom: 16 }}>
+          <span style={{ fontSize: 20 }}>📥</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#9A3412' }}>You have {unimported.length} deal{unimported.length > 1 ? 's' : ''} from the old Leads &amp; Pipeline</div>
+            <div style={{ fontSize: 12.5, color: '#C2410C' }}>Bring them into the Client Journey so everything lives in one place. Nothing is deleted.</div>
+          </div>
+          <button onClick={importDeals} disabled={importing}
+            style={{ background: '#EA580C', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: importing ? 'default' : 'pointer', opacity: importing ? .7 : 1, flexShrink: 0 }}>
+            {importing ? 'Importing…' : 'Import now'}
+          </button>
+        </div>
+      )}
 
       {/* Stat strip */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -151,6 +208,7 @@ export default function ClientJourney() {
       </div>
 
       {/* Board */}
+      {view === 'board' && (
       <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8, alignItems: 'start' }}>
         {JOURNEY_STAGES.map(col => {
           const colItems = visible.filter(j => j.stage === col.key)
@@ -202,6 +260,7 @@ export default function ClientJourney() {
                     </div>
                     {j.name && j.company && <div style={{ fontSize: 11.5, color: 'var(--c-faint)', marginBottom: 8 }}>{j.name}</div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: j.next_step ? 8 : 0 }}>
+                      {j.score && SCORE_STYLE[j.score] && <span style={{ fontSize: 10, fontWeight: 700, color: SCORE_STYLE[j.score].c, background: SCORE_STYLE[j.score].bg, borderRadius: 6, padding: '2px 7px' }}>{SCORE_STYLE[j.score].label}</span>}
                       {j.service && <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--c-ink-3)', background: 'var(--c-fill)', borderRadius: 6, padding: '2px 7px' }}>{j.service}</span>}
                       {j.billing && <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--c-faint)' }}>{j.billing}</span>}
                       {(() => { const pr = latestProposal(j.id); if (!pr) return null; const st = PROPOSAL_STATUS[pr.status]; return <span style={{ fontSize: 10, fontWeight: 700, color: st.c, background: st.bg, borderRadius: 6, padding: '2px 7px' }}>📄 {st.label}</span> })()}
@@ -233,6 +292,17 @@ export default function ClientJourney() {
           )
         })}
       </div>
+      )}
+
+      {/* Leads view — triage the early stages */}
+      {view === 'leads' && (
+        <LeadsView
+          items={visible.filter(j => LEAD_STAGES.includes(j.stage)).sort((a, b) => ((SCORE_RANK[b.score || ''] ?? 0) - (SCORE_RANK[a.score || ''] ?? 0)))}
+          person={person}
+          onOpen={(j) => setDetailId(j.id)}
+          onAdvance={(j) => { const n = nextStage(j.stage); if (n) moveStage(j, n) }}
+        />
+      )}
 
       {/* Lost */}
       {lostItems.length > 0 && (
@@ -272,6 +342,7 @@ export default function ClientJourney() {
         <JourneyDetail
           j={detail}
           ownerName={person(detail.owner_id)?.name}
+          canFinance={canFinance}
           proposals={state.proposals.filter(p => p.journey_id === detail.id)}
           contracts={state.contracts.filter(ct => ct.journey_id === detail.id)}
           onClose={() => setDetailId(null)}
@@ -316,14 +387,28 @@ export default function ClientJourney() {
 }
 
 // ─── Detail drawer ──────────────────────────────────────────────────────────
-function JourneyDetail({ j, ownerName, proposals, contracts, onClose, onEdit, onMove, onLost, onReopen, onDelete, onNewProposal, onOpenProposal, onCopyProposal, onNewContract, onOpenContract, onCopyContract, onAction }: {
-  j: Journey; ownerName?: string; proposals: Proposal[]; contracts: Contract[]
+function JourneyDetail({ j, ownerName, canFinance, proposals, contracts, onClose, onEdit, onMove, onLost, onReopen, onDelete, onNewProposal, onOpenProposal, onCopyProposal, onNewContract, onOpenContract, onCopyContract, onAction }: {
+  j: Journey; ownerName?: string; canFinance: boolean; proposals: Proposal[]; contracts: Contract[]
   onClose: () => void; onEdit: () => void; onMove: (s: JourneyStage) => void
   onLost: () => void; onReopen: () => void; onDelete: () => void
   onNewProposal: () => void; onOpenProposal: (p: Proposal) => void; onCopyProposal: (p: Proposal) => void
   onNewContract: () => void; onOpenContract: (c: Contract) => void; onCopyContract: (c: Contract) => void
   onAction: (label: string) => void
 }) {
+  const [pitch, setPitch] = useState('')
+  const [pitchLoading, setPitchLoading] = useState(false)
+  async function generatePitch() {
+    setPitchLoading(true)
+    try {
+      const res = await fetch('/api/ai/suggest', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'pitch', lead: { name: j.name || j.company, company: j.company, service: j.service || '', budget: j.budget_text || (j.value ? inr(j.value) : ''), source: j.source || '', notes: j.notes || '' } }),
+      })
+      const d = await res.json().catch(() => ({}))
+      setPitch(d.text || d.message || d.reply || (typeof d === 'string' ? d : '') || 'Could not generate a pitch right now.')
+    } catch { setPitch('Could not reach the AI. Try again.') }
+    finally { setPitchLoading(false) }
+  }
   const def = stageDef(j.stage)
   const idx = stageIndex(j.stage)
   const next = nextStage(j.stage)
@@ -362,7 +447,7 @@ function JourneyDetail({ j, ownerName, proposals, contracts, onClose, onEdit, on
             <div style={{ background: def.bg, borderRadius: 12, padding: '13px 15px', marginBottom: 16 }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, color: def.c, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Next move</div>
               <div style={{ fontSize: 13.5, color: 'var(--c-ink-2)', lineHeight: 1.5 }}>{def.hint}</div>
-              {def.action && (
+              {def.action && (canFinance || (def.key !== 'proposal' && def.key !== 'contract')) && (
                 <button onClick={() => def.key === 'proposal' ? onNewProposal() : def.key === 'contract' ? onNewContract() : onAction(def.action!)}
                   style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: def.c, color: '#fff', borderRadius: 9, padding: '7px 13px', fontWeight: 700, fontSize: 12.5, border: 'none', cursor: 'pointer' }}>
                   {def.action}
@@ -370,6 +455,22 @@ function JourneyDetail({ j, ownerName, proposals, contracts, onClose, onEdit, on
               )}
             </div>
 
+            {/* AI pitch — quick outreach draft for early-stage deals */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--c-ghost)', textTransform: 'uppercase', letterSpacing: '.06em' }}>AI outreach pitch</div>
+                <button onClick={generatePitch} disabled={pitchLoading} style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>{pitchLoading ? 'Writing…' : pitch ? 'Regenerate' : '✨ Draft a pitch'}</button>
+              </div>
+              {pitch && (
+                <div style={{ position: 'relative', background: 'var(--c-fill-soft)', border: '1px solid var(--c-border-soft)', borderRadius: 10, padding: '11px 13px', fontSize: 13.5, lineHeight: 1.55, color: 'var(--c-ink-2)', whiteSpace: 'pre-wrap' }}>
+                  {pitch}
+                  <button onClick={() => { try { navigator.clipboard.writeText(pitch) } catch { /* ignore */ } }} style={{ marginTop: 8, fontSize: 11.5, fontWeight: 700, color: 'var(--c-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Copy</button>
+                </div>
+              )}
+            </div>
+
+            {/* Proposals + Agreements — owner/manager only */}
+            {canFinance && (<>
             {/* Proposals */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -429,6 +530,7 @@ function JourneyDetail({ j, ownerName, proposals, contracts, onClose, onEdit, on
                   </div>
                 )}
             </div>
+            </>)}
 
             {/* Facts grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -547,6 +649,25 @@ function JourneyForm({ j, isNew, owners, onChange, onCancel, onSave }: {
               </div>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div><label style={lab}>Lead score</label>
+                <select value={j.score || ''} onChange={e => set({ score: (e.target.value || null) as Journey['score'] })} style={field}>
+                  <option value="">— none —</option>
+                  <option value="hot">🔥 Hot</option>
+                  <option value="warm">Warm</option>
+                  <option value="cold">Cold</option>
+                </select>
+              </div>
+              <div><label style={lab}>Lead status</label>
+                <select value={j.lead_status || ''} onChange={e => set({ lead_status: (e.target.value || null) as Journey['lead_status'] })} style={field}>
+                  <option value="">— none —</option>
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="qualified">Qualified</option>
+                </select>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
               <div><label style={lab}>Next step</label><input value={j.next_step || ''} onChange={e => set({ next_step: e.target.value })} placeholder="Send proposal draft" style={field} /></div>
               <div><label style={lab}>Due</label><input type="date" value={j.next_step_date || ''} onChange={e => set({ next_step_date: e.target.value || null })} style={field} /></div>
@@ -562,5 +683,59 @@ function JourneyForm({ j, isNew, owners, onChange, onCancel, onSave }: {
         </div>
       </div>
     </ModalPortal>
+  )
+}
+
+// ─── Leads view — a fast triage list of early-stage opportunities ─────────────
+function LeadsView({ items, person, onOpen, onAdvance }: {
+  items: Journey[]
+  person: (id?: string | null) => { name: string; initials: string; color: string } | undefined
+  onOpen: (j: Journey) => void
+  onAdvance: (j: Journey) => void
+}) {
+  if (items.length === 0) {
+    return (
+      <div style={{ background: '#fff', border: '1px dashed var(--c-rule)', borderRadius: 18, padding: '48px 20px', textAlign: 'center' }}>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, marginBottom: 6 }}>No open leads</h3>
+        <p style={{ margin: 0, color: 'var(--c-subtle)', fontSize: 14 }}>New leads and prospects show up here for quick triage.</p>
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {items.map(j => {
+        const p = person(j.owner_id)
+        const sc = j.score && SCORE_STYLE[j.score]
+        const overdue = j.next_step_date && j.next_step_date < todayStr()
+        return (
+          <div key={j.id} onClick={() => onOpen(j)}
+            style={{ background: '#fff', border: '1px solid var(--c-border)', borderRadius: 13, padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', cursor: 'pointer' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--c-ink-3)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--c-border)'}>
+            {sc && <span style={{ fontSize: 10.5, fontWeight: 700, color: sc.c, background: sc.bg, borderRadius: 6, padding: '3px 9px', flexShrink: 0 }}>{sc.label}</span>}
+            <div style={{ flex: '1 1 180px', minWidth: 140 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--c-ink)' }}>{j.company || j.name}</div>
+              <div style={{ fontSize: 12.5, color: 'var(--c-faint)', marginTop: 2 }}>
+                {j.name && j.company ? `${j.name} · ` : ''}{j.service || '—'}{j.source ? ` · ${j.source}` : ''}
+              </div>
+            </div>
+            {j.next_step && (
+              <div style={{ fontSize: 12.5, color: overdue ? '#DC2626' : 'var(--c-subtle)', fontWeight: overdue ? 700 : 500, flex: '1 1 140px', minWidth: 120 }}>
+                {j.next_step}{j.next_step_date ? ` · ${new Date(j.next_step_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+              </div>
+            )}
+            {j.value > 0 && <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800, minWidth: 70, textAlign: 'right' }}>{inr(j.value)}</div>}
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: stageDef(j.stage).c, background: stageDef(j.stage).bg, borderRadius: 6, padding: '3px 9px', flexShrink: 0 }}>{stageDef(j.stage).label}</span>
+            {p
+              ? <span title={p.name} style={{ width: 24, height: 24, borderRadius: 7, background: p.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 9.5, fontFamily: 'var(--font-display)', flexShrink: 0 }}>{p.initials}</span>
+              : <span style={{ fontSize: 10, color: 'var(--c-rule)', fontWeight: 600 }}>—</span>}
+            <button onClick={e => { e.stopPropagation(); onAdvance(j) }}
+              style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', background: 'var(--c-ink)', border: 'none', borderRadius: 9, padding: '7px 13px', cursor: 'pointer', flexShrink: 0 }}>
+              Qualify →
+            </button>
+          </div>
+        )
+      })}
+    </div>
   )
 }

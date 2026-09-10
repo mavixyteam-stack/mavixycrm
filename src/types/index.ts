@@ -161,6 +161,10 @@ export interface Journey {
   next_step_date?: string | null
   client_id?: string | null    // linked client once onboarded/active
   lost_reason?: string | null
+  // Lead-triage fields (used in the Leads view of the journey)
+  score?: 'hot' | 'warm' | 'cold' | null
+  lead_status?: 'new' | 'contacted' | 'qualified' | null
+  budget_text?: string | null
   created_at: string
   updated_at?: string | null
 }

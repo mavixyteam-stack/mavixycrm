@@ -10,17 +10,19 @@ export const ROLE_SCREENS: Record<Role, Screen[]> = {
   owner: [
     'myday','planner','calendar','contentplan','dmboard',
     'clients','client-detail','reports',
-    'pipeline','leads','journey','invoices',
+    'journey','invoices',
     'team','onboarding','assistant','performance','permissions','connections','automations','knowledge','attendance',
   ],
   manager: [
     'myday','planner','calendar','contentplan','dmboard',
     'clients','client-detail','reports',
-    'pipeline','leads','journey','invoices',
+    'journey','invoices',
     'team','onboarding','assistant','performance','knowledge','attendance',
   ],
+  // Sales work the Client Journey (their own accounts — see ClientJourney),
+  // but proposals/contracts/invoices stay owner/manager.
   sales: [
-    'myday','clients','client-detail','reports','pipeline','leads','attendance',
+    'myday','clients','client-detail','reports','journey','attendance',
   ],
   employee: [
     'myday','calendar','contentplan','dmboard','knowledge','attendance',

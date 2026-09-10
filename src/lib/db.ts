@@ -90,6 +90,9 @@ export async function dbUpsertJourney(j: Journey) {
     next_step_date: j.next_step_date || null,
     client_id: j.client_id || null,
     lost_reason: j.lost_reason || null,
+    score: j.score || null,
+    lead_status: j.lead_status || null,
+    budget_text: j.budget_text || null,
     updated_at: new Date().toISOString(),
   })
 }
