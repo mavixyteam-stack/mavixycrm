@@ -21,14 +21,16 @@ export async function complete(prompt: string, system?: string): Promise<string>
 }
 
 // Forces valid JSON output (Groq JSON mode). The prompt/system must mention JSON.
-export async function completeJSON(prompt: string, system: string): Promise<string> {
+// maxTokens defaults generously — a truncated response fails JSON validation, so
+// callers producing larger documents (e.g. a full proposal deck) pass more.
+export async function completeJSON(prompt: string, system: string, maxTokens = 2048): Promise<string> {
   const res = await groq.chat.completions.create({
     model: MODEL,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: prompt },
     ],
-    max_tokens: 1024,
+    max_tokens: maxTokens,
     temperature: 0.3,
     response_format: { type: 'json_object' },
   })

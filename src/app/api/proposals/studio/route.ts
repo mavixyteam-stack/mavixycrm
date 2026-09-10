@@ -65,13 +65,15 @@ Ask for ONE thing at a time. Prefer concrete asks ("What's the monthly fee for s
 }
 RULES for the deck: every service's "cells" array MUST have exactly one entry per month, in order. intensity is 0-4. price is a plain integer in ₹ (0 when the service is Off that month). Use realistic Indian agency pricing consistent with what the owner told you; if they gave a monthly total but not the split, distribute it sensibly across services and say so in "message". Keep services to the ones actually in play. Do not invent a client name — if you don't have one, ask.
 
+KEEP IT COMPACT (this is critical — the deck must be short and visual, and the response must stay small): every string is short. promiseHeadline ≤ 7 words. opportunityHeadline ≤ 9 words. opportunityBody ≤ 2 short sentences. each objective ≤ 12 words. assets: 4 max, each 1-3 words. Omit "capabilities" entirely unless the owner asked for specific ones (a good default is filled in automatically). extras: at most 2, each with ≤ 4 short bullets. Never write long paragraphs. The whole "deck" object must be small.
+
 ${ctx}`
 
   const convo = (messages || []).map(m => `${m.role === 'user' ? 'OWNER' : 'YOU'}: ${m.text}`).join('\n')
   const prompt = `${deck ? `CURRENT DRAFT (refine this if the owner asks for changes):\n${JSON.stringify(deck)}\n\n` : ''}CONVERSATION SO FAR:\n${convo}\n\nRespond with the JSON object.`
 
   try {
-    const raw = await completeJSON(prompt, system)
+    const raw = await completeJSON(prompt, system, 7000)   // decks need room to finish valid JSON
     const parsed = JSON.parse(raw)
     return NextResponse.json({
       mode: parsed.mode === 'draft' ? 'draft' : 'ask',
@@ -79,6 +81,10 @@ ${ctx}`
       deck: parsed.mode === 'draft' ? parsed.deck : undefined,
     })
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'AI unavailable' }, { status: 500 })
+    const msg = e instanceof Error ? e.message : ''
+    const friendly = /json_validate|max completion|tokens/i.test(msg)
+      ? "That's a lot of detail in one go — let me make sure I keep it tight. Send it once more (or split it: the plan first, then the pricing) and I'll draft the deck."
+      : "I couldn't put that together just now — give it another try in a moment."
+    return NextResponse.json({ mode: 'ask', message: friendly }, { status: 200 })
   }
 }
