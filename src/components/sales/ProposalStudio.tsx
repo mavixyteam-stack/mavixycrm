@@ -21,19 +21,40 @@ export default function ProposalStudio({ journey, existing, onClose }: {
   const upsert = useUpsertProposal()
   const me = state.currentUser?.id
 
-  const idRef = useRef(existing?.id || (globalThis.crypto?.randomUUID?.() ?? String(Date.now())))
-  const tokenRef = useRef(existing?.token || makeProposalToken())
+  // Same-device resume: an in-progress NEW proposal for this client is cached
+  // in the browser, so closing and reopening "New proposal" picks up where you
+  // left off — even if the server migration for chat/deck hasn't run yet.
+  const cacheKey = `mvx_studio_journey_${journey.id}`
+  const cached = useRef<{ id?: string; token?: string; chat?: ChatTurn[]; deck?: ProposalDeck | null } | null>(null)
+  if (cached.current === null && !existing) {
+    try { const raw = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null; cached.current = raw ? JSON.parse(raw) : {} } catch { cached.current = {} }
+  }
+  const c = cached.current || {}
 
-  const [msgs, setMsgs] = useState<ChatTurn[]>(existing?.chat && existing.chat.length ? existing.chat : [{ role: 'assistant', text: GREETING }])
-  const [deck, setDeck] = useState<ProposalDeck | null>(existing?.deck || null)
+  const idRef = useRef(existing?.id || c.id || (globalThis.crypto?.randomUUID?.() ?? String(Date.now())))
+  const tokenRef = useRef(existing?.token || c.token || makeProposalToken())
+
+  const [msgs, setMsgs] = useState<ChatTurn[]>(
+    existing?.chat?.length ? existing.chat : c.chat?.length ? c.chat : [{ role: 'assistant', text: GREETING }]
+  )
+  const [deck, setDeck] = useState<ProposalDeck | null>(existing?.deck || c.deck || null)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState(false)
   const [listening, setListening] = useState(false)
 
+  function startOver() {
+    if (!window.confirm('Start a fresh proposal for this client? The current draft stays saved in the Proposals list.')) return
+    try { localStorage.removeItem(cacheKey) } catch { /* ignore */ }
+    idRef.current = (globalThis.crypto?.randomUUID?.() ?? String(Date.now()))
+    tokenRef.current = makeProposalToken()
+    setDeck(null); setMsgs([{ role: 'assistant', text: GREETING }]); setInput(''); setPreview(false)
+  }
+
   // Persist the whole session (chat + draft) after every turn, so closing the
-  // tab never loses work — reopen it from the deal's Proposals list.
+  // tab never loses work — resumes on reopen (browser cache + the server row).
   async function persist(chat: ChatTurn[], dk: ProposalDeck | null) {
+    try { localStorage.setItem(cacheKey, JSON.stringify({ id: idRef.current, token: tokenRef.current, chat, deck: dk })) } catch { /* ignore */ }
     const proposal: Proposal = {
       id: idRef.current,
       journey_id: journey.id,
@@ -52,7 +73,6 @@ export default function ProposalStudio({ journey, existing, onClose }: {
       created_at: existing?.created_at || new Date().toISOString(),
     }
     try { await upsert(proposal) } catch { /* ignore */ }
-    try { localStorage.setItem(`mvx_studio_${idRef.current}`, JSON.stringify({ chat, deck: dk })) } catch { /* ignore */ }
   }
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -133,6 +153,7 @@ export default function ProposalStudio({ journey, existing, onClose }: {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {msgs.length > 1 && <button onClick={startOver} title="Start a fresh proposal" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--c-muted)', background: '#fff', border: '1.5px solid var(--c-border)', borderRadius: 9, padding: '7px 12px', cursor: 'pointer' }}>Start over</button>}
               {deck && <button onClick={() => setPreview(p => !p)} style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--c-ink-3)', background: '#fff', border: '1.5px solid var(--c-border)', borderRadius: 9, padding: '7px 12px', cursor: 'pointer' }}>{preview ? 'Back to chat' : 'Preview deck'}</button>}
               <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--c-fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}><X size={14} color="var(--c-ghost)" /></button>
             </div>
